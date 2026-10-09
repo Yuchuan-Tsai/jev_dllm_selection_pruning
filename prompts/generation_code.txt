@@ -1,0 +1,4 @@
+DRAFT: review on development data and freeze before benchmark evaluation.
+Complete the Python function described below. Return only the function implementation, preserving the provided signature.
+
+{problem}

@@ -1,0 +1,32 @@
+[
+  {
+    "question_id": "fixture-add",
+    "prompt": "What is 2 + 3?",
+    "reference": "5",
+    "candidate_texts": [
+      "Fixture candidate 0. Final answer: 5",
+      "Fixture candidate 1. Final answer: 6",
+      "Fixture candidate 2. Final answer: 5",
+      "Fixture candidate 3. Final answer: 6",
+      "Fixture candidate 4. Final answer: 5",
+      "Fixture candidate 5. Final answer: 6",
+      "Fixture candidate 6. Final answer: 5",
+      "Fixture candidate 7. Final answer: 6"
+    ]
+  },
+  {
+    "question_id": "fixture-half",
+    "prompt": "What is 1 divided by 2?",
+    "reference": "0.5",
+    "candidate_texts": [
+      "Fixture candidate 0. Final answer: 1/2",
+      "Fixture candidate 1. Final answer: 2",
+      "Fixture candidate 2. Final answer: 1/2",
+      "Fixture candidate 3. Final answer: 2",
+      "Fixture candidate 4. Final answer: 1/2",
+      "Fixture candidate 5. Final answer: 2",
+      "Fixture candidate 6. Final answer: 1/2",
+      "Fixture candidate 7. Final answer: 2"
+    ]
+  }
+]

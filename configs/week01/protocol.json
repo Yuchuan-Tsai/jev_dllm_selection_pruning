@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "phase": "week01",
+  "frozen": false,
+  "source": {
+    "file": "Jev × dLLM 10-Week Timeline.pdf",
+    "pages": [
+      4,
+      5,
+      6
+    ],
+    "sha256": "4046ae4460ba7633bcaa926edf27c986011af038004f11a2dba62142aeae9a49"
+  },
+  "generator": {
+    "model_id": "GSAI-ML/LLaDA-8B-Instruct",
+    "model_revision": null,
+    "tokenizer_revision": null,
+    "dtype": "bfloat16",
+    "generation_length": 256,
+    "block_size": 32,
+    "temperature": null,
+    "candidates_per_question": 8,
+    "microbatch_size": 1,
+    "selected_backend": null,
+    "sampling_precision": "preserve_upstream_higher_precision_operations"
+  },
+  "backends": {
+    "official_llada": {
+      "repository": "https://github.com/ML-GSAI/LLaDA",
+      "code_commit": null,
+      "steps": null,
+      "cache": "upstream_default",
+      "remasking": "low_confidence"
+    },
+    "fast_dllm_v1": {
+      "repository": "https://github.com/NVlabs/Fast-dLLM",
+      "subdirectory": "v1/llada",
+      "code_commit": null,
+      "steps": null,
+      "cache": "prefix",
+      "confidence_threshold": 0.9
+    }
+  },
+  "judge": {
+    "name": "Jev",
+    "model_version": null,
+    "api_contract_version": null,
+    "endpoint_env": "JEV_ENDPOINT",
+    "api_key_env": "JEV_API_KEY",
+    "request_concurrency": 1,
+    "timeout_seconds": 60,
+    "failure_policy": "record_error_no_silent_fallback"
+  },
+  "datasets": {
+    "manifest_sha256": null,
+    "heldout_targets": {
+      "gsm8k": 500,
+      "math500": 500,
+      "humaneval": 164
+    },
+    "development_sources": null,
+    "processbench_subsets": [
+      "gsm8k",
+      "math"
+    ]
+  },
+  "evaluation": {
+    "numeric_extraction": "explicit_final_marker_or_last_boxed",
+    "math_equivalence_revision": null,
+    "humaneval_harness_revision": null,
+    "processbench_revision": null,
+    "reference_visibility": "evaluation_only"
+  },
+  "prompts": {
+    "generation_math": {
+      "path": "prompts/generation_math.txt",
+      "sha256": null
+    },
+    "generation_code": {
+      "path": "prompts/generation_code.txt",
+      "sha256": null
+    },
+    "jev_final": {
+      "path": "prompts/jev_final.txt",
+      "sha256": null
+    },
+    "jev_partial": {
+      "path": "prompts/jev_partial.txt",
+      "sha256": null
+    }
+  },
+  "runtime": {
+    "hardware": null,
+    "dependency_lock_sha256": null,
+    "master_seed": 20261008
+  },
+  "future": {
+    "candidate_counts": [
+      2,
+      4,
+      8,
+      16
+    ],
+    "checkpoint_blocks": [
+      2,
+      4,
+      6
+    ],
+    "initial_trajectories": 8,
+    "retained_trajectories": 2
+  },
+  "notes": [
+    "All configuration is draft until development validation.",
+    "Microbatch=1, concurrency=1, seed and timeout are scaffold defaults, not prescribed by the timeline.",
+    "Future pruning settings do not run in Week 1."
+  ]
+}
