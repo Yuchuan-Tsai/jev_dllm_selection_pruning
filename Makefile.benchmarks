@@ -1,0 +1,39 @@
+# Independent commands; the active GSM8K Makefile and experiment remain unchanged.
+include Makefile
+.DEFAULT_GOAL := benchmarks-help
+.PHONY: benchmarks-help benchmarks-check benchmarks-upload collection-audit start-math500 start-humaneval gpu-math500 gpu-humaneval
+
+benchmarks-help:
+	@echo 'Mac: make -f Makefile.benchmarks benchmarks-check benchmarks-upload'
+	@echo 'Server: make -f Makefile.benchmarks start-math500 GPU_ID=2'
+	@echo 'Server: make -f Makefile.benchmarks start-humaneval GPU_ID=4'
+	@echo 'Foreground alternatives: gpu-math500 | gpu-humaneval GPU_ID=...'
+	@echo 'After results-pull/results-verify: collection-audit RUN_DIR=...'
+	@echo 'Generation only. No automatic scoring, paid requests, model downloads, or code execution.'
+
+benchmarks-check:
+	$(PYTHON) scripts/collect_benchmarks.py check --task math500
+	$(PYTHON) scripts/collect_benchmarks.py check --task humaneval
+
+benchmarks-upload:
+	$(PYTHON) scripts/collect_benchmarks.py upload --server-config "$(SERVER_CONFIG)"
+
+start-math500:
+	$(GPU_PYTHON) scripts/collect_benchmarks.py start --task math500
+
+start-humaneval:
+	$(GPU_PYTHON) scripts/collect_benchmarks.py start --task humaneval
+
+gpu-math500:
+	$(GPU_PYTHON) scripts/collect_benchmarks.py check --task math500
+	$(MAKE) -f Makefile gpu-fast-check
+	$(GPU_PYTHON) scripts/collect_benchmarks.py run --task math500
+
+gpu-humaneval:
+	$(GPU_PYTHON) scripts/collect_benchmarks.py check --task humaneval
+	$(MAKE) -f Makefile gpu-fast-check
+	$(GPU_PYTHON) scripts/collect_benchmarks.py run --task humaneval
+
+collection-audit:
+	@test -n "$(RUN_DIR)" || (echo 'Set RUN_DIR to a copied, SHA256-verified collection run'; exit 2)
+	$(PYTHON) scripts/collect_benchmarks.py audit --run-dir "$(RUN_DIR)"

@@ -1,0 +1,47 @@
+{
+  "version": "math500_math_verify_v1",
+  "analysis_type": "post_collection_scoring_frozen_before_correctness_inspection",
+  "engine": "math-verify",
+  "engine_version": "0.9.0",
+  "python_major_minor": "3.12",
+  "packages": {
+    "antlr4-python3-runtime": "4.13.2",
+    "latex2sympy2_extended": "1.11.0",
+    "math-verify": "0.9.0",
+    "mpmath": "1.3.0",
+    "sympy": "1.14.0"
+  },
+  "prediction_extraction": {
+    "latex_boxed_priority": 0,
+    "try_extract_without_anchor": true,
+    "extraction_mode": "first_match",
+    "fallback_mode": "first_match",
+    "normalization": "Math-Verify 0.9.0 / latex2sympy2_extended 1.11.0 defaults"
+  },
+  "reference_extraction": "Wrap the pinned reference answer in a LaTeX dollar environment; first-match with string fallback. Never derive a reference from generated text.",
+  "verification": {
+    "float_rounding": 6,
+    "numeric_precision": 15,
+    "strict": true,
+    "allow_set_relation_comp": false,
+    "timeout_seconds": 5
+  },
+  "parsing_timeout_seconds": 5,
+  "max_text_characters": 32768,
+  "question_timeout_seconds": 180,
+  "workers": 4,
+  "candidate_policy": "Retain every original candidate and ID. Empty, incomplete or truncated candidates are incorrect and do not vote. No reference-based extraction or repairs.",
+  "majority_policy": "Reference-free complete-link groups in original candidate order. Add a candidate to the first group whose every member verifies equivalent in BOTH directions; otherwise start a group. Choose the largest group, tie by earliest candidate, return its first original ID. Extraction failures do not vote; if no group exists choose c00 (graded incorrect).",
+  "statistical_unit": "question",
+  "bootstrap_replicates": 2000,
+  "seed": 20261008,
+  "known_limits": [
+    "Pinned upstream floating-point rounding, unit stripping and percentage-magnitude conventions apply; this is automated benchmark scoring, not a general theorem prover.",
+    "Literal fallback matches are reported separately from symbolic parsing.",
+    "The original collection and Jev selection preceded this scoring policy; it cannot retroactively preregister the whole study."
+  ],
+  "sources": [
+    "https://github.com/huggingface/Math-Verify",
+    "https://pypi.org/project/math-verify/0.9.0/"
+  ]
+}

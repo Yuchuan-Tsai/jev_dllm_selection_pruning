@@ -1,0 +1,21 @@
+# Explicit one-retry amendment; original MATH500 selection files remain pinned.
+include Makefile.math500
+.DEFAULT_GOAL := continuation-check
+SOURCE_PLAN ?=
+.PHONY: continuation-prepare continuation-check continuation-live continuation-audit
+
+continuation-prepare:
+	@test -n "$(SOURCE_PLAN)" || (echo 'Set SOURCE_PLAN to the original failed MATH500 Jev plan'; exit 2)
+	$(PYTHON) scripts/continue_math500_jev.py prepare --source-plan "$(SOURCE_PLAN)"
+
+continuation-check:
+	@test -n "$(PLAN_DIR)" || (echo 'Set PLAN_DIR to the prepared continuation'; exit 2)
+	$(PYTHON) scripts/continue_math500_jev.py check --plan "$(PLAN_DIR)"
+
+continuation-live:
+	@test -n "$(PLAN_DIR)" -a -n "$(APPROVED_CALLS)" || (echo 'Set PLAN_DIR and the explicitly approved additional request count'; exit 2)
+	$(PYTHON) scripts/continue_math500_jev.py live --plan "$(PLAN_DIR)" --approved-calls "$(APPROVED_CALLS)" --env-file "$(ENV_FILE)"
+
+continuation-audit:
+	@test -n "$(PLAN_DIR)" || (echo 'Set PLAN_DIR to the completed continuation'; exit 2)
+	$(PYTHON) scripts/continue_math500_jev.py audit --plan "$(PLAN_DIR)"

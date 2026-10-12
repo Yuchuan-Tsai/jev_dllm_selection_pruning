@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "seed": 20261008,
+  "benchmarks": {
+    "gsm8k": {
+      "revision": "3101c7d5072418e28b9008a6636bde82a006892c",
+      "role": "generation_quality",
+      "sources": [
+        {
+          "path": "data/raw/gsm8k-train.jsonl",
+          "url": "https://raw.githubusercontent.com/openai/grade-school-math/3101c7d5072418e28b9008a6636bde82a006892c/grade_school_math/data/train.jsonl",
+          "sha256": "17f347dc51477c50d4efb83959dbb7c56297aba886e5544ee2aaed3024813465",
+          "bytes": 4166206,
+          "rows": 7473,
+          "format": "jsonl"
+        },
+        {
+          "path": "data/raw/gsm8k-test.jsonl",
+          "url": "https://raw.githubusercontent.com/openai/grade-school-math/3101c7d5072418e28b9008a6636bde82a006892c/grade_school_math/data/test.jsonl",
+          "sha256": "3730d312f6e3440559ace48831e51066acaca737f6eabec99bccb9e4b3c39d14",
+          "bytes": 749738,
+          "rows": 1319,
+          "format": "jsonl"
+        }
+      ]
+    },
+    "math500": {
+      "revision": "6e4ed1a2a79af7d8630a6b768ec859cb5af4d3be",
+      "role": "generation_quality",
+      "sources": [
+        {
+          "url": "https://huggingface.co/datasets/HuggingFaceH4/MATH-500/resolve/6e4ed1a2a79af7d8630a6b768ec859cb5af4d3be/test.jsonl",
+          "bytes": 446564,
+          "sha256": "35dc41080a3680858b27fa7e0533d2d547825316fc5dafe5d316f4ccc5a06132",
+          "rows": 500,
+          "path": "data/raw/math500-test.jsonl",
+          "format": "jsonl"
+        }
+      ]
+    },
+    "humaneval": {
+      "revision": "6d43fb980f9fee3c892a914eda09951f772ad10d",
+      "role": "generation_quality",
+      "sources": [
+        {
+          "url": "https://raw.githubusercontent.com/openai/human-eval/6d43fb980f9fee3c892a914eda09951f772ad10d/data/HumanEval.jsonl.gz",
+          "bytes": 44877,
+          "sha256": "b796127e635a67f93fb35c04f4cb03cf06f38c8072ee7cee8833d7bee06979ef",
+          "rows": 164,
+          "path": "data/raw/humaneval.jsonl.gz",
+          "format": "jsonl"
+        }
+      ]
+    },
+    "processbench": {
+      "revision": "3bdcd5371ed567559a78f559c01c13a6deee7604",
+      "role": "separate_diagnostic",
+      "sources": [
+        {
+          "url": "https://huggingface.co/datasets/Qwen/ProcessBench/resolve/3bdcd5371ed567559a78f559c01c13a6deee7604/gsm8k.json",
+          "bytes": 574343,
+          "sha256": "fb1c59dfd1e83e1c5a48dbe598db27e4bc0b8bc524a09445f2d4b69178f61349",
+          "rows": 400,
+          "path": "data/raw/processbench-gsm8k.json",
+          "format": "json",
+          "subset": "gsm8k"
+        },
+        {
+          "url": "https://huggingface.co/datasets/Qwen/ProcessBench/resolve/3bdcd5371ed567559a78f559c01c13a6deee7604/math.json",
+          "bytes": 1938778,
+          "sha256": "60cb0d7a69cbec98d43cf50855b9b7e7294599c3c9a24bdd031abd18c3b6b136",
+          "rows": 1000,
+          "path": "data/raw/processbench-math.json",
+          "format": "json",
+          "subset": "math"
+        }
+      ],
+      "diagnostic_count_per_subset": 50,
+      "official_code_revision": "e8024636bcabdf8bd514440551b531d3f90dd18b",
+      "readiness": "data_preparation_only; official metric and Jev diagnostic adapter remain pending"
+    }
+  }
+}

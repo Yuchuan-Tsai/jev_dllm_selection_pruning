@@ -1,4 +1,4 @@
-"""Run the local CLI without installing packages or accessing the network."""
+"""Run the CLI without installing the core package; remote actions are explicit."""
 from pathlib import Path
 import sys
 

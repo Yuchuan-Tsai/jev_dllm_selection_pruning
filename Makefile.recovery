@@ -1,0 +1,31 @@
+# Keep the original Makefile and frozen implementation byte-for-byte unchanged.
+include Makefile
+RECOVERY_PLAN ?=
+.DEFAULT_GOAL := recovery-help
+.PHONY: recovery-help recovery-plan recovery-audit recovery-upload gpu-recovery-check gpu-gsm8k500-resume
+
+recovery-help:
+	@echo 'Mac: recovery-plan | recovery-audit RUN_DIR=artifacts/downloads/lab/ACTUAL_RUN_ID'
+	@echo 'Mac: recovery-upload RECOVERY_PLAN=artifacts/recovery-plans/ACTUAL_RUN_ID.json'
+	@echo 'Server: gpu-gsm8k500-resume GPU_ID=... RECOVERY_PLAN=artifacts/recovery-plans/ACTUAL_RUN_ID.json'
+	@echo 'Use make -f Makefile.recovery for these commands; see docs/recovery.md.'
+
+recovery-plan:
+	@test -n "$(RUN_DIR)" || (echo 'Set RUN_DIR to the verified interrupted local archive'; exit 2)
+	$(PYTHON) scripts/recovery.py plan --run-dir "$(RUN_DIR)"
+
+recovery-audit:
+	@test -n "$(RUN_DIR)" || (echo 'Set RUN_DIR to a verified local archive'; exit 2)
+	$(PYTHON) scripts/recovery.py audit --run-dir "$(RUN_DIR)"
+
+recovery-upload:
+	@test -n "$(RECOVERY_PLAN)" || (echo 'Set RECOVERY_PLAN to the prepared plan file'; exit 2)
+	$(PYTHON) scripts/recovery.py upload --plan "$(RECOVERY_PLAN)" --server-config "$(SERVER_CONFIG)"
+
+gpu-recovery-check:
+	@test -n "$(RECOVERY_PLAN)" || (echo 'Set RECOVERY_PLAN to the uploaded plan file'; exit 2)
+	$(GPU_PYTHON) scripts/recovery.py source-check --plan "$(RECOVERY_PLAN)"
+
+gpu-gsm8k500-resume: gpu-recovery-check
+	$(MAKE) -f Makefile gpu-fast-check
+	$(GPU_PYTHON) scripts/recovery.py run --plan "$(RECOVERY_PLAN)"

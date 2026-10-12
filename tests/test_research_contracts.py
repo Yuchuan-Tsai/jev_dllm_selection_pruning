@@ -112,7 +112,8 @@ class ProtocolTests(unittest.TestCase):
 
     def test_draft_valid_but_unresolved(self):
         self.assertFalse(self.config['frozen'])
-        self.assertIn('generator.model_revision', self.pending)
+        self.assertIn('evaluation.math_equivalence_revision', self.pending)
+        self.assertNotIn('generator.model_revision', self.pending)
         self.assertNotIn('prompts.jev_partial.sha256', self.pending)
 
     def test_unresolved_protocol_cannot_be_frozen(self):

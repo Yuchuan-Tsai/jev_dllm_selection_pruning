@@ -1,0 +1,19 @@
+{
+  "model": "jev-1.13.0",
+  "scope": "limited_processbench_first_error_diagnostic",
+  "subsets": {
+    "gsm8k": 50,
+    "math": 50
+  },
+  "data_manifest_sha256": "f6fedafdcf0df5888cc6cbc087c0113ff19b2ec53dbf4dd42213c0d7cf6bf034",
+  "prompt": {
+    "path": "prompts/jev_processbench.txt",
+    "sha256": "a040fdfe89b60257f9da187566a73b2b734508046d48992bbae86f5af540417d"
+  },
+  "official_code_revision": "e8024636bcabdf8bd514440551b531d3f90dd18b",
+  "official_code_url": "https://raw.githubusercontent.com/QwenLM/ProcessBench/e8024636bcabdf8bd514440551b531d3f90dd18b/code/run_eval.py",
+  "official_code_sha256": "66d09fc7a3d20d46f166d4bba4e04835f3d7473e1534b6908cd9045aefc7b704",
+  "task_adaptation": "Choice over zero-based indices and -1; no reference solution or label in requests.",
+  "semantic_overlap_review_complete": false,
+  "restriction": "Report separately. Do not use outcomes to tune the answer selector while semantic overlap review is pending."
+}

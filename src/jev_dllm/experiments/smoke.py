@@ -25,10 +25,12 @@ def run(root: Path, output: Path | None = None) -> Path:
     run_id = datetime.now(timezone.utc).strftime("smoke-%Y%m%dT%H%M%SZ-") + uuid.uuid4().hex[:8]
     run_dir = (output or root / "artifacts/runs") / run_id
     run_dir.mkdir(parents=True, exist_ok=False)
-    public_rows, private_rows, requests = [], [], []
+    public_rows, private_rows, requests, questions, references = [], [], [], [], []
     texts, labels = {}, {}
     for item in fixtures:
         question = Question(item["question_id"], "synthetic_numeric", "fixture", item["prompt"])
+        questions.append(asdict(question))
+        references.append({"question_id": question.question_id, "answer": item["reference"]})
         candidates = [Candidate(question.question_id, f"{question.question_id}/c{i:02}",
                                 trajectory_seed(20261008, question.question_id, i), text, True, False)
                       for i, text in enumerate(item["candidate_texts"])]
@@ -43,6 +45,8 @@ def run(root: Path, output: Path | None = None) -> Path:
         (run_dir / name).write_text("".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows), encoding="utf-8")
     (run_dir / "evaluation_private").mkdir()
     _write_json(run_dir / "evaluation_private/labels.json", private_rows)
+    _write_json(run_dir / "questions.json", questions)
+    _write_json(run_dir / "evaluation_private/references.json", references)
     try:
         commit = subprocess.run(["git", "rev-parse", "HEAD"], cwd=root, capture_output=True,
                                 text=True, check=False, timeout=5).stdout.strip() or None
@@ -51,7 +55,7 @@ def run(root: Path, output: Path | None = None) -> Path:
     config = json.loads((root / "configs/week01/protocol.json").read_text(encoding="utf-8"))
     _write_json(run_dir / "config.snapshot.json", config)
     _write_json(run_dir / "manifest.json", {
-        "run_id": run_id, "mode": "synthetic_smoke_only", "is_benchmark_result": False,
+        "run_id": run_id, "mode": "synthetic_smoke_only", "status": "running", "is_benchmark_result": False,
         "generator": None, "judge_called": False, "git_commit": commit,
         "python": platform.python_version(), "platform": platform.platform(),
         "fixture_sha256": fingerprint(fixtures), "protocol_sha256": fingerprint(config),
@@ -59,6 +63,14 @@ def run(root: Path, output: Path | None = None) -> Path:
         "master_seed": 20261008,
     })
     _write_json(run_dir / "metrics.json", {"mode": "synthetic_smoke_only", **pool_metrics(texts, labels)})
+    from .selection import evaluate_pools, judge_pools
+    evaluate_pools(run_dir / "questions.json", run_dir / "candidates.jsonl",
+                   run_dir / "evaluation_private/references.json", run_dir / "selection_checks")
+    judge_pools(run_dir / "questions.json", run_dir / "candidates.jsonl",
+                root / "prompts/jev_final.txt", run_dir / "selection_checks", "jev-1.13.0")
     cost = asdict(CostRecord(end_to_end_seconds=time.perf_counter() - started, api_cost_usd=0.0))
     _write_json(run_dir / "costs.json", {"mode": "synthetic_smoke_only", **cost})
+    manifest = json.loads((run_dir / "manifest.json").read_text())
+    manifest["status"] = "complete"
+    _write_json(run_dir / "manifest.json", manifest)
     return run_dir

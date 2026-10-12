@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "scope": "early_heldout_answer_collection_v1",
+  "task": "humaneval",
+  "question_count": 164,
+  "generation_settings_locked": true,
+  "evaluation_ready": false,
+  "authorization": "User requested immediate parallel collection of both full benchmarks before the remaining evaluators are finished.",
+  "limitations": [
+    "No task-specific real GPU/development validation yet.",
+    "Keep truncated/incomplete answers; no quality-based resampling or prompt/length tuning on these held-out outputs.",
+    "This is not a scored benchmark or a completed Week 1 protocol.",
+    "HumanEval source is saved as text only; hidden tests and references are not generator inputs."
+  ],
+  "length_basis": {
+    "url": "https://github.com/ML-GSAI/LLaDA/blob/9182493720ed723ef8031210d85959364e51cbe0/EVAL.md",
+    "note": "The pinned official Instruct evaluation lists 512-token budgets for Math and HumanEval. Our Fast/block/stochastic setup differs and does not reproduce those published scores."
+  },
+  "backend_profile": {
+    "schema_version": 2,
+    "scope": "completed_answer_selection",
+    "phase": "early_heldout_answer_collection_v1",
+    "frozen": false,
+    "generator": {
+      "model_id": "GSAI-ML/LLaDA-8B-Instruct",
+      "model_revision": "08b83a6feb34df1a6011b80c3c00c7563e963b07",
+      "tokenizer_revision": "08b83a6feb34df1a6011b80c3c00c7563e963b07",
+      "dtype": "bfloat16",
+      "generation_length": 512,
+      "block_size": 32,
+      "temperature": 1.0,
+      "candidates_per_question": 8,
+      "microbatch_size": 1,
+      "selected_backend": "fast_dllm_v1"
+    },
+    "backends": {
+      "fast_dllm_v1": {
+        "repository": "https://github.com/NVlabs/Fast-dLLM",
+        "code_commit": "620b34fb1755aac89c50f3230119c42f373924db",
+        "subdirectory": "llada",
+        "source_manifest_path": "configs/week01/fast-source.json",
+        "source_manifest_sha256": "c9edc38d687873ff789d2939c61489507d17f0debc44039a2c99e04a2ec7c82c",
+        "steps": 512,
+        "cache": "prefix",
+        "confidence_threshold": 0.9,
+        "remasking": "low_confidence"
+      }
+    },
+    "judge": {
+      "model_version": "jev-1.13.0",
+      "api_key_env": "TYPESAFE_API_KEY",
+      "endpoint": "https://api.typesafe.ai/v1/systemone",
+      "failure_policy": "stop_and_record_no_automatic_retry"
+    },
+    "datasets": {
+      "name": "humaneval",
+      "revision": "6d43fb980f9fee3c892a914eda09951f772ad10d",
+      "manifest_path": "data/manifests/humaneval-week01.json",
+      "manifest_sha256": "093ac4dced07dd619ab050c5bec28dea99f0430d337ff0cd627dc7c19eed6999",
+      "questions_path": "data/processed/humaneval-heldout.json",
+      "questions_sha256": "6f175833f32bf07bdd172f6e70589d7c7e4d6df5ebef3f83438e5893a525ee1e",
+      "dev_count": 0,
+      "heldout_count": 164
+    },
+    "prompts": {
+      "generation_math": {
+        "path": "prompts/collection/humaneval.txt",
+        "sha256": "f405fc151b949c9746d186a781378fad3a8a5c687784d7544c812baa335e97f4"
+      },
+      "jev_final": {
+        "path": "prompts/jev_final.txt",
+        "sha256": "a74827e6c98dff5a01642a1c3fe127410e691985cb830d50abbfb9a08e34b89e"
+      }
+    },
+    "runtime": {
+      "hardware": "NVIDIA A100-SXM4-80GB",
+      "dependency_lock_sha256": "c3d90ae57d916dc41447a870b6f82b90a7dfb036b6e5204f0e083fc347aae613",
+      "master_seed": 20261008
+    },
+    "readiness": {
+      "generation_validated": false,
+      "jev_access_validated": false,
+      "protocol_reviewed": false
+    },
+    "notes": [
+      "The legacy generation_math key stores this task-specific prompt.",
+      "Generator profile is pinned for collection only; scoring, separate development validation and full research protocol remain pending.",
+      "Length 512 is a pre-generation task choice, not tuned on these benchmark outcomes. Retain block size 32 and existing Fast prefix-cache sampling."
+    ]
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "version": "humaneval_full_source_strict_v1",
+  "image": "python@sha256:e88e9763f943ec1834f992a4b51e0f24500486803e8bc534e5767af9ea65f6ce",
+  "python_major_minor": "3.11",
+  "candidate_policy": "Execute the complete saved source unchanged. Do not prepend the prompt, strip fences, repair syntax, or add imports. Incomplete, truncated and empty records fail and remain in the denominator.",
+  "test_policy": "Execute the pinned official hidden tests and call check(entry_point). This is a custom full-source harness, not the original prompt-plus-completion harness or EvalPlus.",
+  "candidate_timeout_seconds": 3,
+  "container_watchdog_seconds": 30,
+  "memory_mib": 512,
+  "child_address_space_mib": 384,
+  "pids_limit": 64,
+  "tmpfs_mib": 64,
+  "cpu_limit": 1,
+  "workers": 4,
+  "master_seed": 20261008,
+  "limits": "Functional benchmark tests do not prove arbitrary program correctness or resistance to adversarial test-harness tampering. The container limits protect the host; runtime guards are not a security sandbox. No network, host mounts, secrets or Docker socket are passed to candidates.",
+  "generation_scope": "Early held-out collection; this scoring policy does not retroactively freeze the full multi-task research protocol."
+}

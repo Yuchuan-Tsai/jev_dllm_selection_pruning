@@ -1,0 +1,3 @@
+Solve the following mathematics problem. Show your reasoning clearly and put your final answer inside \boxed{...}. Preserve any symbolic expression, set, interval, or units required by the question.
+
+{question}

@@ -22,11 +22,33 @@ data/processed/*
 !data/processed/.gitkeep
 data/private/*
 !data/private/.gitkeep
-artifacts/runs/*
-!artifacts/runs/.gitkeep
-artifacts/checkpoints/*
-!artifacts/checkpoints/.gitkeep
-reports/figures/*
-!reports/figures/.gitkeep
-reports/tables/*
-!reports/tables/.gitkeep
+
+# GPU environments, per-machine settings, and local result archives
+.venv-gpu/
+configs/server/local.json
+
+# Local machine-specific server directory record
+/docs/*.local.md
+
+# All experiment outputs and written results stay local.
+/artifacts/*
+/reports/*
+/results/
+/outputs/
+/output/
+/logs/
+# Personal research documentation stays local, including blank templates.
+/docs/
+/Jev × dLLM 10-Week Timeline.pdf
+/configs/README.md
+/data/README.md
+
+# Unused future interfaces and detailed module notes remain local.
+/src/jev_dllm/pruning/
+/src/jev_dllm/backends/base.py
+/src/jev_dllm/judges/base.py
+/src/jev_dllm/**/README.md
+/prompts/README.md
+
+# Isolated CPU mathematical-equivalence runtime
+.venv-math/

@@ -1,0 +1,7 @@
+{
+  "ssh_host": "YOUR_SSH_ALIAS",
+  "remote_root": "/home/YOUR_USERNAME/jev_dllm_selection_pruning",
+  "local_results": "artifacts/downloads/lab",
+  "sync_interval_seconds": 60,
+  "remote_python": ".venv-gpu/bin/python"
+}

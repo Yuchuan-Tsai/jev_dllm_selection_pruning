@@ -1,0 +1,7 @@
+# Initial Linux x86_64 / Python 3.11 server profile; not a validated lock.
+# make gpu-install first installs this torch build from the official CUDA 12.1 index.
+# Do not install this GPU profile into the Mac's local core environment.
+# Lock the complete environment after the actual A100 pilot succeeds.
+transformers==4.38.2
+torch==2.5.1+cu121
+numpy==1.26.4

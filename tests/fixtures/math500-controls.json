@@ -1,0 +1,218 @@
+[
+  {
+    "case_id": "integer",
+    "reference": "42",
+    "prediction": "\\boxed{42}",
+    "expected_correct": true
+  },
+  {
+    "case_id": "wrong_integer",
+    "reference": "42",
+    "prediction": "\\boxed{43}",
+    "expected_correct": false
+  },
+  {
+    "case_id": "negative",
+    "reference": "-7",
+    "prediction": "\\boxed{-7}",
+    "expected_correct": true
+  },
+  {
+    "case_id": "fraction",
+    "reference": "\\frac{3}{8}",
+    "prediction": "\\boxed{0.375}",
+    "expected_correct": true
+  },
+  {
+    "case_id": "fraction_wrong",
+    "reference": "\\frac{3}{8}",
+    "prediction": "\\boxed{0.37}",
+    "expected_correct": false
+  },
+  {
+    "case_id": "radical",
+    "reference": "\\sqrt{12}",
+    "prediction": "\\boxed{2\\sqrt{3}}",
+    "expected_correct": true
+  },
+  {
+    "case_id": "radical_wrong",
+    "reference": "\\sqrt{12}",
+    "prediction": "\\boxed{3\\sqrt{2}}",
+    "expected_correct": false
+  },
+  {
+    "case_id": "polynomial",
+    "reference": "x^2+6x+9",
+    "prediction": "\\boxed{(x+3)^2}",
+    "expected_correct": true
+  },
+  {
+    "case_id": "polynomial_wrong",
+    "reference": "x^2+6x+9",
+    "prediction": "\\boxed{(x+2)^2}",
+    "expected_correct": false
+  },
+  {
+    "case_id": "variable_names",
+    "reference": "x+1",
+    "prediction": "\\boxed{y+1}",
+    "expected_correct": false
+  },
+  {
+    "case_id": "set_order",
+    "reference": "\\{2,5\\}",
+    "prediction": "\\boxed{\\{5,2\\}}",
+    "expected_correct": true
+  },
+  {
+    "case_id": "set_missing",
+    "reference": "\\{2,5\\}",
+    "prediction": "\\boxed{\\{2\\}}",
+    "expected_correct": false
+  },
+  {
+    "case_id": "interval",
+    "reference": "(-2,3]",
+    "prediction": "\\boxed{(-2,3]}",
+    "expected_correct": true
+  },
+  {
+    "case_id": "interval_boundary",
+    "reference": "(-2,3]",
+    "prediction": "\\boxed{[-2,3]}",
+    "expected_correct": false
+  },
+  {
+    "case_id": "tuple_order",
+    "reference": "(3,1)",
+    "prediction": "\\boxed{(1,3)}",
+    "expected_correct": false
+  },
+  {
+    "case_id": "matrix",
+    "reference": "\\begin{pmatrix}1&0\\\\0&1\\end{pmatrix}",
+    "prediction": "\\boxed{\\begin{pmatrix}1&0\\\\0&1\\end{pmatrix}}",
+    "expected_correct": true
+  },
+  {
+    "case_id": "pi",
+    "reference": "2\\pi",
+    "prediction": "\\boxed{\\pi+\\pi}",
+    "expected_correct": true
+  },
+  {
+    "case_id": "inequality",
+    "reference": "x<3",
+    "prediction": "\\boxed{3>x}",
+    "expected_correct": true
+  },
+  {
+    "case_id": "inequality_wrong",
+    "reference": "x<3",
+    "prediction": "\\boxed{x>3}",
+    "expected_correct": false
+  },
+  {
+    "case_id": "assignment",
+    "reference": "7",
+    "prediction": "\\boxed{x=7}",
+    "expected_correct": true
+  },
+  {
+    "case_id": "text_label",
+    "reference": "\\text{no solution}",
+    "prediction": "\\boxed{\\text{no solution}}",
+    "expected_correct": true
+  },
+  {
+    "case_id": "percent_value",
+    "reference": "\\frac{1}{4}",
+    "prediction": "\\boxed{25\\%}",
+    "expected_correct": true
+  },
+  {
+    "case_id": "percent_magnitude_convention",
+    "reference": "25",
+    "prediction": "\\boxed{25\\%}",
+    "expected_correct": true
+  },
+  {
+    "case_id": "decimal_precision",
+    "reference": "\\frac{1}{3}",
+    "prediction": "\\boxed{0.333333}",
+    "expected_correct": true
+  },
+  {
+    "case_id": "decimal_too_coarse",
+    "reference": "\\frac{1}{3}",
+    "prediction": "\\boxed{0.333}",
+    "expected_correct": false
+  },
+  {
+    "case_id": "final_anchor",
+    "reference": "17",
+    "prediction": "The final answer is 17.",
+    "expected_correct": true
+  },
+  {
+    "case_id": "last_box_wrong",
+    "reference": "17",
+    "prediction": "First \\boxed{17}. Final answer: \\boxed{18}.",
+    "expected_correct": false
+  },
+  {
+    "case_id": "intermediate_not_final",
+    "reference": "17",
+    "prediction": "Intermediate $17$. Final answer: 18.",
+    "expected_correct": false
+  },
+  {
+    "case_id": "malformed_final",
+    "reference": "17",
+    "prediction": "Intermediate $17$. Final answer: \\boxed{\\frac{}}",
+    "expected_correct": false
+  },
+  {
+    "case_id": "empty_box",
+    "reference": "17",
+    "prediction": "\\boxed{}",
+    "expected_correct": false
+  },
+  {
+    "case_id": "unclosed_box",
+    "reference": "17",
+    "prediction": "Final answer: \\boxed{",
+    "expected_correct": false
+  },
+  {
+    "case_id": "no_answer",
+    "reference": "17",
+    "prediction": "I cannot solve this problem.",
+    "expected_correct": false
+  },
+  {
+    "case_id": "empty",
+    "reference": "17",
+    "prediction": "",
+    "expected_correct": false
+  },
+  {
+    "case_id": "python_text",
+    "reference": "17",
+    "prediction": "\\boxed{__import__('os').system('echo UNSAFE')}",
+    "expected_correct": false
+  },
+  {
+    "case_id": "multiple_box_set",
+    "reference": "\\{2,5\\}",
+    "prediction": "\\boxed{2} or \\boxed{5}",
+    "expected_correct": true
+  },
+  {
+    "case_id": "multiple_box_extra",
+    "reference": "2",
+    "prediction": "\\boxed{2} or \\boxed{5}",
+    "expected_correct": false
+  }
+]

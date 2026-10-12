@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "jev-dllm"
 version = "0.1.0"
-description = "Jev-guided answer selection and trajectory pruning for a fixed dLLM"
+description = "Jev answer selection for a fixed diffusion language model"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = []

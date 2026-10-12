@@ -1,0 +1,73 @@
+{
+  "schema_version": 2,
+  "scope": "completed_answer_selection",
+  "phase": "week01_backend_comparison",
+  "frozen": false,
+  "generator": {
+    "model_id": "GSAI-ML/LLaDA-8B-Instruct",
+    "model_revision": "08b83a6feb34df1a6011b80c3c00c7563e963b07",
+    "tokenizer_revision": "08b83a6feb34df1a6011b80c3c00c7563e963b07",
+    "dtype": "bfloat16",
+    "generation_length": 256,
+    "block_size": 32,
+    "temperature": 1.0,
+    "candidates_per_question": 8,
+    "microbatch_size": 1,
+    "selected_backend": "fast_dllm_v1"
+  },
+  "backends": {
+    "fast_dllm_v1": {
+      "repository": "https://github.com/NVlabs/Fast-dLLM",
+      "code_commit": "620b34fb1755aac89c50f3230119c42f373924db",
+      "subdirectory": "llada",
+      "source_manifest_path": "configs/week01/fast-source.json",
+      "source_manifest_sha256": "c9edc38d687873ff789d2939c61489507d17f0debc44039a2c99e04a2ec7c82c",
+      "steps": 256,
+      "cache": "prefix",
+      "confidence_threshold": 0.9,
+      "remasking": "low_confidence"
+    }
+  },
+  "judge": {
+    "model_version": "jev-1.13.0",
+    "api_key_env": "TYPESAFE_API_KEY",
+    "endpoint": "https://api.typesafe.ai/v1/systemone",
+    "failure_policy": "stop_and_record_no_automatic_retry"
+  },
+  "datasets": {
+    "name": "gsm8k",
+    "source_repository": "https://github.com/openai/grade-school-math",
+    "revision": "3101c7d5072418e28b9008a6636bde82a006892c",
+    "manifest_path": "data/manifests/gsm8k-week01.json",
+    "manifest_sha256": "807aa52b342c65789d010948c6c05580f514a68030a11c80f20b7f02dfc76d06",
+    "dev_count": 20,
+    "heldout_count": 500,
+    "questions_sha256": "2fe272860e068626a3062cd21ec3046ab0b87bda84a62cd248cc8d1187feb197"
+  },
+  "prompts": {
+    "generation_math": {
+      "path": "prompts/generation_math.txt",
+      "sha256": "03a3066561cc06f1621d0d098b2cd1835dfa30dfbab9f52d627661b4e1a3dc72"
+    },
+    "jev_final": {
+      "path": "prompts/jev_final.txt",
+      "sha256": "a74827e6c98dff5a01642a1c3fe127410e691985cb830d50abbfb9a08e34b89e"
+    }
+  },
+  "runtime": {
+    "hardware": null,
+    "dependency_lock_sha256": "c3d90ae57d916dc41447a870b6f82b90a7dfb036b6e5204f0e083fc347aae613",
+    "master_seed": 20261008
+  },
+  "readiness": {
+    "generation_validated": false,
+    "jev_access_validated": false,
+    "protocol_reviewed": false
+  },
+  "notes": [
+    "Development-only backend comparison using the same cached model, prompts, 20 public questions, N=8, length=256, block=32, temperature=1 and seed convention as diversity.json.",
+    "Fast-dLLM uses prefix caching and confidence threshold 0.9. NFE is measured, not assumed equal to configured steps. Preserve upstream sampling precision and RNG draws.",
+    "Run gpu-fast-check first. Existing runtime is reused, no compile/flash-attn installation and no second weight download.",
+    "The existing official N=8 run is the reference; different sampling backends need not produce identical trajectories. This is an initial comparison, not a controlled same-session timing claim."
+  ]
+}

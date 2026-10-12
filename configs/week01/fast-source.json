@@ -1,0 +1,34 @@
+{
+  "repository": "https://github.com/NVlabs/Fast-dLLM",
+  "code_commit": "620b34fb1755aac89c50f3230119c42f373924db",
+  "subdirectory": "llada",
+  "license": "Apache-2.0",
+  "files": {
+    "llada/generate.py": {
+      "bytes": 15228,
+      "sha256": "24cdd31322c2053e896f4d3c36cce6814ff541441596910cfe28833043ef3360"
+    },
+    "llada/model/__init__.py": {
+      "bytes": 826,
+      "sha256": "1e50c30889851f7c96b7e6a0cc220b9e939ac47f9395cf9ef275540d50cf7429"
+    },
+    "llada/model/modeling_llada.py": {
+      "bytes": 68840,
+      "sha256": "983385c0b2a6d71323a59bc8b192b66d40210326c0d8e54f1000f20e85bf2e41"
+    },
+    "llada/model/configuration_llada.py": {
+      "bytes": 12835,
+      "sha256": "5a58ffb848ee7fa18c34ca9289d13aaec062d40bae694caa69552689417f7b06"
+    },
+    "LICENSE": {
+      "bytes": 11335,
+      "sha256": "62f1aefe5a00ddc91541b3ddc7922f0508f10911431bebffa6b98c434b07c0b3"
+    }
+  },
+  "notes": [
+    "Stable Fast-dLLM v1 before the torch.compile changes; upstream used llada/ at this revision.",
+    "Source files are unmodified. Preserve upstream float64 Gumbel and confidence calculations.",
+    "Prefix cache with threshold 0.9 changes sampling compute and may change quality; measure locally.",
+    "The upstream full evaluation requirements use transformers 4.49.0. Our narrow adapter targets the existing 4.38.2 runtime, gated by a tiny-model runtime check and strict checkpoint loading. No real-server compatibility claim before these pass."
+  ]
+}

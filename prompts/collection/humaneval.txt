@@ -1,0 +1,3 @@
+Implement the Python function specified below. Return only complete Python source code, including the supplied imports and function signature. Preserve the function name and arguments. Implement the requested behavior and any necessary helper functions. Do not include Markdown fences, explanations, examples, or tests.
+
+{question}

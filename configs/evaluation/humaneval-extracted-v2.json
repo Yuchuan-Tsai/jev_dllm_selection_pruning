@@ -1,0 +1,21 @@
+{
+  "version": "humaneval_single_block_v2",
+  "extractor": "python_single_block_v1",
+  "analysis_type": "post_hoc_reanalysis",
+  "policy": [
+    "Preserve syntactically valid whole Python exactly, including literal fence strings; static AST parsing executes no code.",
+    "Otherwise accept exactly one pair of standalone backtick or tilde fences of at least length three, with matching marker type and closing length at least the opening length.",
+    "Allow only empty, python, python3 or py opening labels, case insensitive; closing fence must be unlabeled.",
+    "Take the enclosed substring exactly, preserving whitespace, indentation, comments, imports and line endings. Discard surrounding prose without examining correctness.",
+    "Reject empty, multiple, mismatched or unclosed blocks; do not select among blocks, repair syntax, add imports, rename functions, complete bodies or consult references.",
+    "Unfenced source stays unchanged even when syntactically invalid. All candidates remain in the scoring denominator.",
+    "Record raw/extracted hashes and character spans; retain the original archive and strict scores."
+  ],
+  "strict_implementation_sha256": {
+    "configs/evaluation/humaneval-strict-v1.json": "e64d8bbbfbcbffa47875c3d8347a49eb6046bdbaeadcd0c6f5c178b93c1d0491",
+    "src/jev_dllm/evaluation/humaneval_worker.py": "7b90b93d012284c23f313a68e20f8a1146242383b9161f61ebd82353a86aa6e4",
+    "src/jev_dllm/evaluation/humaneval_isolated.py": "7217614e0006cb682b304bc41d22a1b0c83d2424f9cfdc3737f108405ab780a4",
+    "scripts/score_humaneval.py": "a04c52cc7b922030afe1c5f5dc73e8a19f67df47db5ac19d4f6f4e9dc9298daa"
+  },
+  "scope_note": "Explicitly authorized reanalysis after the strict format limitation was observed. Not a new untouched held-out experiment. No GPU generation or Jev calls."
+}
