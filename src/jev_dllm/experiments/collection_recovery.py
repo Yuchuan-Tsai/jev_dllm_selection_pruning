@@ -20,7 +20,7 @@ from ..schema import Candidate, CostRecord
 
 KIND = "benchmark_collection_candidate_recovery_v1"
 EXTENSION_FILES = (
-    "Makefile.benchmarks-recovery", "scripts/recover_collection.py",
+    "Makefile", "scripts/recover_collection.py",
     "src/jev_dllm/experiments/collection_recovery.py", "src/jev_dllm/operations/collection_recovery.py",
 )
 

@@ -6,7 +6,7 @@ from ..config import validate
 from ..reproducibility import fingerprint, trajectory_seed
 
 PROFILE = "configs/week01/gsm8k500.json"
-RECORD = "configs/week01/gsm8k500-freeze.json"
+RECORD = "configs/week01/gsm8k500-freeze-v2.json"
 PHASE = "gsm8k500_heldout_selection"
 
 

@@ -23,9 +23,9 @@ from ..schema import Candidate, CostRecord, Question
 
 TASKS = {"math500": 500, "humaneval": 164}
 SCOPE = "early_heldout_answer_collection_v1"
-LOCK = "configs/collection/generation-lock.json"
+LOCK = "configs/collection/generation-lock-v2.json"
 EXTENSION = (
-    "Makefile.benchmarks", "scripts/collect_benchmarks.py",
+    "Makefile", "scripts/collect_benchmarks.py",
     "src/jev_dllm/experiments/collection.py", "src/jev_dllm/operations/collection.py",
     "configs/collection/math500.json", "configs/collection/humaneval.json",
     "prompts/collection/math500.txt", "prompts/collection/humaneval.txt",
@@ -57,7 +57,7 @@ def check(root, task):
             raise ValueError("Pinned collection paths must not contain symlinks")
         if frozen.sha256(p) != expected:
             raise ValueError(f"Pinned collection file changed: {name}; do not refresh pins after generation")
-    # The existing GSM8K freeze and all original pinned implementations stay intact.
+    # Check the matching GSM8K implementation record before task-specific inputs.
     original = json.loads((root / frozen.PROFILE).read_text())
     frozen.check_protocol(root, original, root / original["datasets"]["questions_path"])
     spec = json.loads((root / path).read_text())

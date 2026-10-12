@@ -15,7 +15,7 @@ VERSION = "math500_raw_jev_v1"
 MODEL = "jev-1.13.0"
 SEED = 20261008
 PROMPT = "prompts/jev_final.txt"
-FILES = ("src/jev_dllm/experiments/math500_jev.py", "scripts/judge_math500.py", "Makefile.math500", PROMPT,
+FILES = ("src/jev_dllm/experiments/math500_jev.py", "scripts/judge_math500.py", "Makefile", PROMPT,
          "src/jev_dllm/judges/typesafe.py", "src/jev_dllm/judges/credentials.py",
          "src/jev_dllm/experiments/selection.py", "src/jev_dllm/reproducibility.py",
          "src/jev_dllm/schema.py", "src/jev_dllm/operations/remote.py") + collection_recovery.EXTENSION_FILES

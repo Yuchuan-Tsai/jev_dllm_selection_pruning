@@ -13,7 +13,7 @@ from ..selection.baselines import random_choice
 
 VERSION = "humaneval_jev_one_retry_v1"
 FILES = ("src/jev_dllm/experiments/humaneval_jev_continuation.py",
-         "scripts/continue_humaneval_jev.py", "Makefile.humaneval-jev-recovery")
+         "scripts/continue_humaneval_jev.py", "Makefile")
 sha256 = original.frozen.sha256
 
 

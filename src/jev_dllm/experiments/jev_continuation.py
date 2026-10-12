@@ -12,7 +12,7 @@ from ..judges.typesafe import TypeSafeJudge, build_request, parse_response
 from ..reproducibility import fingerprint, trajectory_seed
 
 
-IMPLEMENTATION = ('src/jev_dllm/experiments/jev_continuation.py', 'scripts/continue_jev.py', 'Makefile.jev')
+IMPLEMENTATION = ('src/jev_dllm/experiments/jev_continuation.py', 'scripts/continue_jev.py', 'Makefile')
 
 
 def jsonl(path):

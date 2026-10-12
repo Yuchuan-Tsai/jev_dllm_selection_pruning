@@ -1,4 +1,4 @@
-"""Additive deployment and explicit tmux launches for answer collection."""
+"""Task deployment and explicit tmux launches for answer collection."""
 import json
 import os
 from pathlib import Path
@@ -14,7 +14,7 @@ from ..experiments import collection
 def upload_files(root):
     for task in collection.TASKS:
         collection.check(root, task)
-    # Never overwrite GSM8K code, profiles, inputs, run files or its deployment record.
+    # Transfer task files and the shared Makefile; deploy the matching full version first.
     return sorted(set(collection.EXTENSION + collection.INPUTS + (collection.LOCK,)))
 
 
@@ -41,7 +41,7 @@ def upload(root, config):
                         "--files-from", listing.name, "-e", shlex.join(["ssh", *remote.SSH_OPTIONS]),
                         str(root) + "/", f"{config['ssh_host']}:{config['remote_root']}/"], check=True)
     return {"status": "uploaded", "files": len(names),
-            "note": "Added collection code/public questions only. GSM8K files, weights, environments, secrets and private labels were not transferred."}
+            "note": "Transferred the shared Makefile, collection code and public task inputs. Use a matching full deployment; weights, environments, secrets and private labels were not transferred."}
 
 
 def launch(root, task):
@@ -74,7 +74,7 @@ def session_run(root, task, gpu_id, cache):
     # Preserve the pane after completion/errors, so a failed startup cannot disappear.
     subprocess.run(["tmux", "set-window-option", "remain-on-exit", "on"], check=True)
     env = dict(os.environ, GPU_ID=gpu_id, JEV_SHARED_HUB_CACHE=cache)
-    result = subprocess.run(["make", "-f", "Makefile.benchmarks", "gpu-" + task, "GPU_ID=" + gpu_id],
+    result = subprocess.run(["make", "-f", "Makefile", "gpu-" + task, "GPU_ID=" + gpu_id],
                             cwd=root, env=env)
     print(f"{task} command exited with status {result.returncode}. Outputs are retained.", flush=True)
     if result.returncode:

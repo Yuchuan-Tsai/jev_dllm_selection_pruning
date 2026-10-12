@@ -12,7 +12,7 @@ from ..reproducibility import fingerprint
 
 VERSION = "math500_jev_one_retry_v1"
 FILES = ("src/jev_dllm/experiments/math500_jev_continuation.py",
-         "scripts/continue_math500_jev.py", "Makefile.math500-jev-recovery")
+         "scripts/continue_math500_jev.py", "Makefile")
 sha256 = original.frozen.sha256
 
 

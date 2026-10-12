@@ -20,7 +20,7 @@ from ..schema import Candidate, CostRecord
 
 KIND = "gsm8k500_manual_candidate_recovery_v1"
 EXTENSION_FILES = (
-    "Makefile.recovery", "scripts/recovery.py",
+    "Makefile", "scripts/recovery.py",
     "src/jev_dllm/experiments/recovery.py", "src/jev_dllm/operations/recovery.py",
 )
 

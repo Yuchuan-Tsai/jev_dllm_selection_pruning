@@ -217,7 +217,7 @@ class CollectionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'counts disagree'):
             collection.audit(self.root, copied)
 
-    def test_additive_upload_excludes_existing_gsm8k_files_private_data_and_weights(self):
+    def test_task_upload_excludes_gsm8k_inputs_private_data_and_weights(self):
         transferred = []
         required = collection.EXTENSION + (collection.LOCK,)
         def command(args, **kwargs):
@@ -262,7 +262,7 @@ class CollectionTests(unittest.TestCase):
             run.return_value = SimpleNamespace(returncode=0)
             operations.session_run(self.root, 'humaneval', '4', '/scratch/cache')
             self.assertEqual(run.call_args_list[0].args[0], ['tmux', 'set-window-option', 'remain-on-exit', 'on'])
-            self.assertEqual(run.call_args_list[1].args[0], ['make', '-f', 'Makefile.benchmarks', 'gpu-humaneval', 'GPU_ID=4'])
+            self.assertEqual(run.call_args_list[1].args[0], ['make', '-f', 'Makefile', 'gpu-humaneval', 'GPU_ID=4'])
             self.assertEqual(run.call_args_list[1].kwargs['env']['JEV_SHARED_HUB_CACHE'], '/scratch/cache')
             self.assertEqual(run.call_count, 2)
 

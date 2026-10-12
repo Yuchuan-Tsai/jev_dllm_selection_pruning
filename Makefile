@@ -18,6 +18,18 @@ GPU_ID ?=
 N ?= 8
 QUESTION_COUNT ?= 1164
 RUNS ?= 10
+RECOVERY_PLAN ?=
+PLAN ?=
+APPROVED_CALLS ?=
+STRICT_RUN ?=
+PLAN_DIR ?=
+SCORE_RUN ?=
+SOURCE_PLAN ?=
+MATH_PYTHON ?= .venv-math/bin/python
+MATH_BOOTSTRAP_PYTHON ?= python3.12
+JEV_PLAN ?=
+VALIDATION_RUN ?=
+SCORING_PLAN ?=
 export GPU_ID
 
 .DEFAULT_GOAL := help
@@ -27,6 +39,11 @@ export GPU_ID
 .PHONY: git-audit smoke-keep smoke-clean processbench-dry-run processbench-live processbench-evaluate help setup doctor check test smoke week1-check fetch-inputs data-fetch data-prepare data-check week1-data check-splits storage gpu-disk gpu-setup gpu-install gpu-check gpu-status gpu-fetch-model gpu-pilot gpu-diversity judge-dry-run judge-live evaluate remote-plan remote-check remote-upload results-pull results-watch results-verify results-clean
 
 help:
+	@echo 'Single command entry point: make TARGET [VARIABLE=value]; see README.md.'
+	@echo 'More commands: benchmarks-help | humaneval-help | math500-help | math500-scoring-help'
+	@echo 'Generation recovery: gsm8k500-recovery-help | collection-recovery-help'
+	@echo 'Jev recovery: jev-continuation-{check,live}; humaneval-jev-continuation-{prepare,check,live,evaluate}'
+	@echo 'MATH500 Jev recovery: math500-jev-continuation-{prepare,check,live,audit}; math500-jev-resume-{prepare,check,live,audit}'
 	@echo 'GSM8K-500: gsm8k500-check (Mac); remote-upload; gpu-gsm8k500 GPU_ID=... (server)'
 	@echo 'Verified 500-question archive: gsm8k500-dry-run | gsm8k500-judge (500 paid calls) | gsm8k500-evaluate RUN_DIR=...'
 	@echo 'Week 1 backend comparison: fetch-fast-inputs (Mac), gpu-fast-check, gpu-fast-diversity GPU_ID=... (server)'
@@ -41,7 +58,7 @@ help:
 	@echo 'Mac after transfer: judge-dry-run RUN_DIR=... | judge-live RUN_DIR=... | evaluate RUN_DIR=...'
 	@echo 'Mac SSH: remote-plan | remote-check | remote-upload | results-pull | results-watch'
 	@echo 'Mac terminal runs: results-verify RUN_ID=... | results-clean RUN_ID=... (deletes verified remote run)'
-	@echo 'Set SERVER_CONFIG to your ignored configs/server/local.json; see docs/server-workflow.md.'
+	@echo 'Set SERVER_CONFIG to your ignored configs/server/local.json; see README.md.'
 
 setup:
 	python3 -m venv .venv
@@ -186,7 +203,7 @@ processbench-evaluate:
 	$(PYTHON) scripts/processbench.py evaluate --run-dir "$(DIAGNOSTIC_RUN_DIR)"
 
 git-audit:
-	@echo 'Tracked files under artifacts/ and reports/ (only their README.md files should appear):'
+	@echo 'Tracked files under artifacts/ and reports/ (expected empty):'
 	@git ls-files -- artifacts reports
 	@echo 'Tracked files matching ignore rules (expected empty):'
 	@git ls-files -ci --exclude-standard
@@ -215,3 +232,270 @@ gsm8k500-judge:
 gsm8k500-evaluate:
 	@test -n "$(RUN_DIR)" || (echo 'Set RUN_DIR to the verified GSM8K-500 archive'; exit 2)
 	$(PYTHON) scripts/jev.py evaluate-pool --config configs/week01/gsm8k500.json --questions data/processed/gsm8k-heldout.json --candidates "$(RUN_DIR)/candidates.jsonl" --references data/private/gsm8k-heldout-references.json --scorer gsm8k_units_v3 $(if $(SELECTIONS),--selections "$(SELECTIONS)",)
+
+# MATH500 and HumanEval generation
+.PHONY: benchmarks-help benchmarks-check benchmarks-upload collection-audit start-math500 start-humaneval gpu-math500 gpu-humaneval
+
+benchmarks-help:
+	@echo 'Mac: make benchmarks-check benchmarks-upload'
+	@echo 'Server: make start-math500 GPU_ID=2'
+	@echo 'Server: make start-humaneval GPU_ID=4'
+	@echo 'Foreground alternatives: gpu-math500 | gpu-humaneval GPU_ID=...'
+	@echo 'After results-pull/results-verify: collection-audit RUN_DIR=...'
+	@echo 'Generation only. No automatic scoring, paid requests, model downloads, or code execution.'
+
+benchmarks-check:
+	$(PYTHON) scripts/collect_benchmarks.py check --task math500
+	$(PYTHON) scripts/collect_benchmarks.py check --task humaneval
+
+benchmarks-upload:
+	$(PYTHON) scripts/collect_benchmarks.py upload --server-config "$(SERVER_CONFIG)"
+
+start-math500:
+	$(GPU_PYTHON) scripts/collect_benchmarks.py start --task math500
+
+start-humaneval:
+	$(GPU_PYTHON) scripts/collect_benchmarks.py start --task humaneval
+
+gpu-math500:
+	$(GPU_PYTHON) scripts/collect_benchmarks.py check --task math500
+	$(MAKE) gpu-fast-check
+	$(GPU_PYTHON) scripts/collect_benchmarks.py run --task math500
+
+gpu-humaneval:
+	$(GPU_PYTHON) scripts/collect_benchmarks.py check --task humaneval
+	$(MAKE) gpu-fast-check
+	$(GPU_PYTHON) scripts/collect_benchmarks.py run --task humaneval
+
+collection-audit:
+	@test -n "$(RUN_DIR)" || (echo 'Set RUN_DIR to a copied, SHA256-verified collection run'; exit 2)
+	$(PYTHON) scripts/collect_benchmarks.py audit --run-dir "$(RUN_DIR)"
+
+
+# GSM8K generation recovery
+.PHONY: gsm8k500-recovery-help gsm8k500-recovery-plan gsm8k500-recovery-audit gsm8k500-recovery-upload gpu-gsm8k500-recovery-check gpu-gsm8k500-resume
+
+gsm8k500-recovery-help:
+	@echo 'Mac: gsm8k500-recovery-plan | gsm8k500-recovery-audit RUN_DIR=artifacts/downloads/lab/ACTUAL_RUN_ID'
+	@echo 'Mac: gsm8k500-recovery-upload RECOVERY_PLAN=artifacts/recovery-plans/ACTUAL_RUN_ID.json'
+	@echo 'Server: gpu-gsm8k500-resume GPU_ID=... RECOVERY_PLAN=artifacts/recovery-plans/ACTUAL_RUN_ID.json'
+
+gsm8k500-recovery-plan:
+	@test -n "$(RUN_DIR)" || (echo 'Set RUN_DIR to the verified interrupted local archive'; exit 2)
+	$(PYTHON) scripts/recovery.py plan --run-dir "$(RUN_DIR)"
+
+gsm8k500-recovery-audit:
+	@test -n "$(RUN_DIR)" || (echo 'Set RUN_DIR to a verified local archive'; exit 2)
+	$(PYTHON) scripts/recovery.py audit --run-dir "$(RUN_DIR)"
+
+gsm8k500-recovery-upload:
+	@test -n "$(RECOVERY_PLAN)" || (echo 'Set RECOVERY_PLAN to the prepared plan file'; exit 2)
+	$(PYTHON) scripts/recovery.py upload --plan "$(RECOVERY_PLAN)" --server-config "$(SERVER_CONFIG)"
+
+gpu-gsm8k500-recovery-check:
+	@test -n "$(RECOVERY_PLAN)" || (echo 'Set RECOVERY_PLAN to the uploaded plan file'; exit 2)
+	$(GPU_PYTHON) scripts/recovery.py source-check --plan "$(RECOVERY_PLAN)"
+
+gpu-gsm8k500-resume: gpu-gsm8k500-recovery-check
+	$(MAKE) gpu-fast-check
+	$(GPU_PYTHON) scripts/recovery.py run --plan "$(RECOVERY_PLAN)"
+
+
+# MATH500 and HumanEval generation recovery
+.PHONY: collection-recovery-help collection-recovery-plan collection-recovery-audit collection-recovery-upload gpu-collection-recovery-check gpu-collection-resume
+
+collection-recovery-help:
+	@echo 'Mac: collection-recovery-plan | collection-recovery-audit RUN_DIR=artifacts/downloads/lab/ACTUAL_RUN_ID'
+	@echo 'Mac: collection-recovery-upload RECOVERY_PLAN=artifacts/collection-recovery-plans/ACTUAL_RUN_ID.json'
+	@echo 'Server: gpu-collection-resume GPU_ID=... RECOVERY_PLAN=artifacts/collection-recovery-plans/ACTUAL_RUN_ID.json'
+
+collection-recovery-plan:
+	@test -n "$(RUN_DIR)" || (echo 'Set RUN_DIR to the verified interrupted local archive'; exit 2)
+	$(PYTHON) scripts/recover_collection.py plan --run-dir "$(RUN_DIR)"
+
+collection-recovery-audit:
+	@test -n "$(RUN_DIR)" || (echo 'Set RUN_DIR to a verified local archive'; exit 2)
+	$(PYTHON) scripts/recover_collection.py audit --run-dir "$(RUN_DIR)"
+
+collection-recovery-upload:
+	@test -n "$(RECOVERY_PLAN)" || (echo 'Set RECOVERY_PLAN to the prepared plan file'; exit 2)
+	$(PYTHON) scripts/recover_collection.py upload --plan "$(RECOVERY_PLAN)" --server-config "$(SERVER_CONFIG)"
+
+gpu-collection-recovery-check:
+	@test -n "$(RECOVERY_PLAN)" || (echo 'Set RECOVERY_PLAN to the uploaded plan file'; exit 2)
+	$(GPU_PYTHON) scripts/recover_collection.py source-check --plan "$(RECOVERY_PLAN)"
+
+gpu-collection-resume: gpu-collection-recovery-check
+	$(MAKE) gpu-fast-check
+	$(GPU_PYTHON) scripts/recover_collection.py run --plan "$(RECOVERY_PLAN)"
+
+
+# GSM8K Jev continuation
+.PHONY: jev-continuation-check jev-continuation-live
+
+jev-continuation-check:
+	@test -n "$(PLAN)" || (echo 'Set PLAN to the prepared continuation directory'; exit 2)
+	$(PYTHON) scripts/continue_jev.py --plan "$(PLAN)"
+
+jev-continuation-live:
+	@test -n "$(PLAN)" -a -n "$(APPROVED_CALLS)" || (echo 'Set PLAN and the explicitly approved additional call count'; exit 2)
+	$(PYTHON) scripts/continue_jev.py --plan "$(PLAN)" --live --approved-calls "$(APPROVED_CALLS)" --env-file "$(ENV_FILE)"
+
+
+# HumanEval scoring and Jev selection
+.PHONY: humaneval-help humaneval-image humaneval-validate humaneval-score
+
+humaneval-help:
+	@echo 'Mac only: humaneval-image (explicit image download); humaneval-validate (independent container fixtures)'
+	@echo 'humaneval-score RUN_DIR=... (verified HumanEval archive; no API calls)'
+	@echo 'Extraction: humaneval-extraction-check | humaneval-extraction-validate | humaneval-reanalyze RUN_DIR=... STRICT_RUN=...'
+
+humaneval-image:
+	docker pull python@sha256:e88e9763f943ec1834f992a4b51e0f24500486803e8bc534e5767af9ea65f6ce
+
+humaneval-validate:
+	$(PYTHON) scripts/score_humaneval.py --validate-only
+
+humaneval-score:
+	@test -n "$(RUN_DIR)" || (echo 'Set RUN_DIR to a complete, verified HumanEval archive'; exit 2)
+	$(PYTHON) scripts/score_humaneval.py --run-dir "$(RUN_DIR)"
+
+.PHONY: humaneval-extraction-check humaneval-extraction-validate humaneval-reanalyze
+
+humaneval-extraction-check:
+	$(PYTHON) -m unittest discover -s tests -p 'test_humaneval_extraction.py' -v
+
+humaneval-extraction-validate:
+	$(PYTHON) scripts/reanalyze_humaneval.py --validate-only
+
+humaneval-reanalyze:
+	@test -n "$(RUN_DIR)" -a -n "$(STRICT_RUN)" || (echo 'Set RUN_DIR and its original STRICT_RUN evaluation'; exit 2)
+	$(PYTHON) scripts/reanalyze_humaneval.py --run-dir "$(RUN_DIR)" --strict-run "$(STRICT_RUN)"
+
+.PHONY: humaneval-jev-prepare humaneval-jev-live humaneval-jev-evaluate
+humaneval-jev-prepare:
+	@test -n "$(RUN_DIR)" || (echo 'Set RUN_DIR to the verified HumanEval archive'; exit 2)
+	$(PYTHON) scripts/judge_humaneval.py prepare --run-dir "$(RUN_DIR)"
+
+humaneval-jev-live:
+	@test -n "$(PLAN_DIR)" -a -n "$(APPROVED_CALLS)" || (echo 'Set PLAN_DIR and APPROVED_CALLS to the planned paid request count'; exit 2)
+	$(PYTHON) scripts/judge_humaneval.py live --plan-dir "$(PLAN_DIR)" --approved-calls "$(APPROVED_CALLS)" --env-file "$(ENV_FILE)"
+
+humaneval-jev-evaluate:
+	@test -n "$(PLAN_DIR)" -a -n "$(SCORE_RUN)" || (echo 'Set PLAN_DIR and SCORE_RUN to its completed extraction evaluation'; exit 2)
+	$(PYTHON) scripts/judge_humaneval.py evaluate --plan-dir "$(PLAN_DIR)" --score-run "$(SCORE_RUN)"
+
+
+# HumanEval Jev continuation
+.PHONY: humaneval-jev-continuation-prepare humaneval-jev-continuation-check humaneval-jev-continuation-live humaneval-jev-continuation-evaluate
+
+humaneval-jev-continuation-prepare:
+	@test -n "$(SOURCE_PLAN)" || (echo 'Set SOURCE_PLAN to the original failed HumanEval Jev plan'; exit 2)
+	$(PYTHON) scripts/continue_humaneval_jev.py prepare --source-plan "$(SOURCE_PLAN)"
+
+humaneval-jev-continuation-check:
+	@test -n "$(PLAN_DIR)" || (echo 'Set PLAN_DIR to the prepared continuation'; exit 2)
+	$(PYTHON) scripts/continue_humaneval_jev.py check --plan "$(PLAN_DIR)"
+
+humaneval-jev-continuation-live:
+	@test -n "$(PLAN_DIR)" -a -n "$(APPROVED_CALLS)" || (echo 'Set PLAN_DIR and the explicitly approved additional request count'; exit 2)
+	$(PYTHON) scripts/continue_humaneval_jev.py live --plan "$(PLAN_DIR)" --approved-calls "$(APPROVED_CALLS)" --env-file "$(ENV_FILE)"
+
+humaneval-jev-continuation-evaluate:
+	@test -n "$(PLAN_DIR)" -a -n "$(SCORE_RUN)" || (echo 'Set PLAN_DIR and its original extracted-code SCORE_RUN'; exit 2)
+	$(PYTHON) scripts/continue_humaneval_jev.py evaluate --plan "$(PLAN_DIR)" --score-run "$(SCORE_RUN)"
+
+
+# MATH500 Jev selection
+.PHONY: math500-help math500-jev-prepare math500-jev-check math500-jev-live math500-jev-audit
+
+math500-help:
+	@echo 'Mac: math500-jev-prepare RUN_DIR=... PLAN_DIR=artifacts/runs/UNIQUE_PLAN_NAME'
+	@echo 'Mac: math500-jev-check PLAN_DIR=... (offline public request verification)'
+	@echo 'Mac: math500-jev-live PLAN_DIR=... APPROVED_CALLS=500 (500 PAID requests)'
+	@echo 'Mac: math500-jev-audit PLAN_DIR=... (selection integrity/usage; correctness scoring separate)'
+
+math500-jev-prepare:
+	@test -n "$(RUN_DIR)" -a -n "$(PLAN_DIR)" || (echo 'Set RUN_DIR and PLAN_DIR'; exit 2)
+	$(PYTHON) scripts/judge_math500.py prepare --run-dir "$(RUN_DIR)" --plan-dir "$(PLAN_DIR)"
+
+math500-jev-check:
+	@test -n "$(PLAN_DIR)" || (echo 'Set PLAN_DIR to the prepared request directory'; exit 2)
+	$(PYTHON) scripts/judge_math500.py check --plan-dir "$(PLAN_DIR)"
+
+math500-jev-live:
+	@test -n "$(PLAN_DIR)" -a -n "$(APPROVED_CALLS)" || (echo 'Set PLAN_DIR and APPROVED_CALLS to the planned paid request count'; exit 2)
+	$(PYTHON) scripts/judge_math500.py live --plan-dir "$(PLAN_DIR)" --approved-calls "$(APPROVED_CALLS)" --env-file "$(ENV_FILE)"
+
+math500-jev-audit:
+	@test -n "$(PLAN_DIR)" || (echo 'Set PLAN_DIR to the completed request directory'; exit 2)
+	$(PYTHON) scripts/judge_math500.py audit --plan-dir "$(PLAN_DIR)"
+
+
+# MATH500 Jev continuation
+.PHONY: math500-jev-continuation-prepare math500-jev-continuation-check math500-jev-continuation-live math500-jev-continuation-audit
+
+math500-jev-continuation-prepare:
+	@test -n "$(SOURCE_PLAN)" || (echo 'Set SOURCE_PLAN to the original failed MATH500 Jev plan'; exit 2)
+	$(PYTHON) scripts/continue_math500_jev.py prepare --source-plan "$(SOURCE_PLAN)"
+
+math500-jev-continuation-check:
+	@test -n "$(PLAN_DIR)" || (echo 'Set PLAN_DIR to the prepared continuation'; exit 2)
+	$(PYTHON) scripts/continue_math500_jev.py check --plan "$(PLAN_DIR)"
+
+math500-jev-continuation-live:
+	@test -n "$(PLAN_DIR)" -a -n "$(APPROVED_CALLS)" || (echo 'Set PLAN_DIR and the explicitly approved additional request count'; exit 2)
+	$(PYTHON) scripts/continue_math500_jev.py live --plan "$(PLAN_DIR)" --approved-calls "$(APPROVED_CALLS)" --env-file "$(ENV_FILE)"
+
+math500-jev-continuation-audit:
+	@test -n "$(PLAN_DIR)" || (echo 'Set PLAN_DIR to the completed continuation'; exit 2)
+	$(PYTHON) scripts/continue_math500_jev.py audit --plan "$(PLAN_DIR)"
+
+
+# MATH500 Jev continuation-chain resume
+.PHONY: math500-jev-resume-prepare math500-jev-resume-check math500-jev-resume-live math500-jev-resume-audit
+
+math500-jev-resume-prepare:
+	@test -n "$(SOURCE_PLAN)" || (echo 'Set SOURCE_PLAN to the most recent failed MATH500 Jev continuation'; exit 2)
+	$(PYTHON) scripts/resume_math500_jev.py prepare --source-plan "$(SOURCE_PLAN)"
+
+math500-jev-resume-check:
+	@test -n "$(PLAN_DIR)" || (echo 'Set PLAN_DIR to the prepared continuation'; exit 2)
+	$(PYTHON) scripts/resume_math500_jev.py check --plan "$(PLAN_DIR)"
+
+math500-jev-resume-live:
+	@test -n "$(PLAN_DIR)" -a -n "$(APPROVED_CALLS)" || (echo 'Set PLAN_DIR and the explicitly approved additional request count'; exit 2)
+	$(PYTHON) scripts/resume_math500_jev.py live --plan "$(PLAN_DIR)" --approved-calls "$(APPROVED_CALLS)" --env-file "$(ENV_FILE)"
+
+math500-jev-resume-audit:
+	@test -n "$(PLAN_DIR)" || (echo 'Set PLAN_DIR to the completed continuation'; exit 2)
+	$(PYTHON) scripts/resume_math500_jev.py audit --plan "$(PLAN_DIR)"
+
+
+# MATH500 offline scoring
+.PHONY: math500-scoring-help math500-scoring-setup math500-validate math500-scoring-prepare math500-scoring-check math500-evaluate
+
+math500-scoring-help:
+	@echo 'Mac offline: math500-scoring-setup; math500-validate'
+	@echo 'Freeze: math500-scoring-prepare RUN_DIR=... JEV_PLAN=... VALIDATION_RUN=...'
+	@echo 'Score: math500-scoring-check SCORING_PLAN=...; math500-evaluate SCORING_PLAN=...'
+
+math500-scoring-setup:
+	$(MATH_BOOTSTRAP_PYTHON) -m venv .venv-math
+	$(MATH_PYTHON) -m pip install --require-hashes --only-binary=:all: -r requirements/math500-cpu.lock
+	$(MATH_PYTHON) -m pip check
+
+math500-validate:
+	$(PYTHON) scripts/score_math500.py validate --math-python "$(MATH_PYTHON)"
+
+math500-scoring-prepare:
+	@test -n "$(RUN_DIR)" -a -n "$(JEV_PLAN)" -a -n "$(VALIDATION_RUN)" || (echo 'Set RUN_DIR, JEV_PLAN and VALIDATION_RUN'; exit 2)
+	$(PYTHON) scripts/score_math500.py prepare --math-python "$(MATH_PYTHON)" --run-dir "$(RUN_DIR)" --jev-plan "$(JEV_PLAN)" --validation "$(VALIDATION_RUN)"
+
+math500-scoring-check:
+	@test -n "$(SCORING_PLAN)" || (echo 'Set SCORING_PLAN'; exit 2)
+	$(PYTHON) scripts/score_math500.py check --math-python "$(MATH_PYTHON)" --plan "$(SCORING_PLAN)"
+
+math500-evaluate:
+	@test -n "$(SCORING_PLAN)" || (echo 'Set SCORING_PLAN'; exit 2)
+	$(PYTHON) scripts/score_math500.py evaluate --math-python "$(MATH_PYTHON)" --plan "$(SCORING_PLAN)"

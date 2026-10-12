@@ -12,6 +12,23 @@ Public questions -> LLaDA / Fast-dLLM on a GPU -> saved candidate pools
 
 Eight candidates per question is `N=8`. Questions, candidate order and sampling seeds are recorded. The commands in this repository perform completed-answer selection.
 
+All commands use the root `Makefile`: run `make help` for the overview, or
+`make benchmarks-help`, `make humaneval-help` and `make math500-help` for task commands.
+Recovery targets include the task name so HumanEval and MATH500 cannot shadow
+one another. No `make -f` option is needed.
+
+## Version compatibility
+
+The consolidated commands use new `gsm8k500-freeze-v2.json` and
+`generation-lock-v2.json` implementation records for **new runs**. Sampling
+settings, source revisions, prompts, seeds and scoring rules are unchanged.
+The original records remain intact as historical metadata; old archives and Jev
+plans must be analyzed or resumed using the code revision recorded when they
+were created. Do not refresh their checksums to make them pass under this version.
+The previous public implementation is available at commit `872ecad`.
+Use separate server directories for different versions, and upload the complete
+matching version with `make remote-upload` before using task-specific transfers.
+
 ## Setup and local checks
 
 Python 3.11+ is required for the dependency-free local core. The GPU environment uses the separately pinned Linux/Python 3.11 requirements. HumanEval code execution uses an isolated, pinned Docker image. Optional MATH500 scoring uses a separate Python 3.12 CPU environment with a wheel-hash lock.
@@ -41,7 +58,7 @@ On the local computer, after configuring SSH:
 ```sh
 make remote-plan
 make remote-upload
-make -f Makefile.benchmarks benchmarks-check benchmarks-upload
+make benchmarks-check benchmarks-upload
 ```
 
 On the server, enter its project directory, set `JEV_SHARED_HUB_CACHE` to the existing model cache and inspect GPU availability. Supply one available A100 index to the chosen command:
@@ -50,8 +67,8 @@ On the server, enter its project directory, set `JEV_SHARED_HUB_CACHE` to the ex
 nvidia-smi
 make gpu-gsm8k500 GPU_ID=5
 # Alternative tasks; choose an available GPU for each concurrent job:
-make -f Makefile.benchmarks start-humaneval GPU_ID=0
-make -f Makefile.benchmarks start-math500 GPU_ID=5
+make start-humaneval GPU_ID=0
+make start-math500 GPU_ID=5
 ```
 
 The `start-*` targets create separate tmux sessions and refuse a duplicate session name. Foreground alternatives are `gpu-humaneval` and `gpu-math500`. Generation creates a new uniquely named run each time. These example GPU indices are not allocations. The current BF16 profiles require native BF16 hardware; V100 needs a separately reviewed precision protocol.
@@ -68,19 +85,19 @@ Use `make results-watch` for periodic copying. Copying does not delete server da
 
 ## Resume interrupted collection
 
-Use `Makefile.benchmarks-recovery` for a MATH500 or HumanEval collection stopped
+Use `make collection-recovery-plan` for a MATH500 or HumanEval collection stopped
 by Ctrl+C. After copying and verifying the interrupted run as above, prepare and
 upload its recovery plan locally:
 
 ```sh
-make -f Makefile.benchmarks-recovery recovery-plan RUN_DIR="artifacts/downloads/lab/$RUN_ID"
-make -f Makefile.benchmarks-recovery recovery-upload RECOVERY_PLAN="artifacts/collection-recovery-plans/$RUN_ID.json"
+make collection-recovery-plan RUN_DIR="artifacts/downloads/lab/$RUN_ID"
+make collection-recovery-upload RECOVERY_PLAN="artifacts/collection-recovery-plans/$RUN_ID.json"
 ```
 
 Then, in a server tmux session with the existing model cache configured:
 
 ```sh
-make -f Makefile.benchmarks-recovery gpu-collection-resume GPU_ID=5 RECOVERY_PLAN="artifacts/collection-recovery-plans/$RUN_ID.json"
+make gpu-collection-resume GPU_ID=5 RECOVERY_PLAN="artifacts/collection-recovery-plans/$RUN_ID.json"
 ```
 
 Set `RUN_ID` on both computers to the same exact interrupted directory name and
@@ -93,10 +110,10 @@ its own timing. No paid Jev requests occur. After another interruption, copy and
 verify the **new** run and prepare its own plan; duplicate recovery launches from
 the same source are blocked. Do not delete the launch claim to bypass this check.
 
-After recovery finishes, copy and verify the new run, then use `recovery-audit`
+After recovery finishes, copy and verify the new run, then use `collection-recovery-audit`
 with its local `RUN_DIR` to check the retained prefix and provenance. The ordinary
 `gpu-math500`/`gpu-humaneval` targets still start new collections from zero. GSM8K
-retains its separate `Makefile.recovery` workflow.
+uses `gsm8k500-recovery-plan`, `gsm8k500-recovery-upload` and `gpu-gsm8k500-resume`; see `make gsm8k500-recovery-help`.
 
 ## MATH500 Jev selection
 
@@ -107,11 +124,11 @@ when applicable. Run these commands on the local computer:
 # Set RUN_ID to the exact complete archive directory name.
 RUN_DIR="artifacts/downloads/lab/$RUN_ID"
 PLAN_DIR="artifacts/runs/math500-jev-plan-$RUN_ID"
-make -f Makefile.math500 math500-jev-prepare RUN_DIR="$RUN_DIR" PLAN_DIR="$PLAN_DIR"
-make -f Makefile.math500 math500-jev-check PLAN_DIR="$PLAN_DIR"
+make math500-jev-prepare RUN_DIR="$RUN_DIR" PLAN_DIR="$PLAN_DIR"
+make math500-jev-check PLAN_DIR="$PLAN_DIR"
 # This command sends 500 PAID requests using TYPESAFE_API_KEY from the ignored .env:
-make -f Makefile.math500 math500-jev-live PLAN_DIR="$PLAN_DIR" APPROVED_CALLS=500
-make -f Makefile.math500 math500-jev-audit PLAN_DIR="$PLAN_DIR"
+make math500-jev-live PLAN_DIR="$PLAN_DIR" APPROVED_CALLS=500
+make math500-jev-audit PLAN_DIR="$PLAN_DIR"
 ```
 
 Each request contains one public question and its eight original answers in
@@ -128,16 +145,15 @@ The final audit verifies the raw responses and selected original IDs, saves
 calculate mathematical correctness: accuracy and dollar cost remain unknown.
 Use the separate offline MATH500 scorer below for correctness comparisons; the existing GSM8K numeric scorer is not a substitute.
 
-For a MATH500 Choice/probability mismatch after a valid saved prefix, the separate
-`Makefile.math500-jev-recovery` extension prepares a one-retry amendment:
+For a MATH500 Choice/probability mismatch after a valid saved prefix, `make math500-jev-continuation-prepare` prepares a one-retry amendment:
 
 ```sh
-make -f Makefile.math500-jev-recovery continuation-prepare SOURCE_PLAN="$SOURCE_PLAN"
+make math500-jev-continuation-prepare SOURCE_PLAN="$SOURCE_PLAN"
 # Set PLAN_DIR to the new continuation directory printed above.
-make -f Makefile.math500-jev-recovery continuation-check PLAN_DIR="$PLAN_DIR"
+make math500-jev-continuation-check PLAN_DIR="$PLAN_DIR"
 # APPROVED_CALLS must equal additional_paid_calls in the checked plan.
-make -f Makefile.math500-jev-recovery continuation-live PLAN_DIR="$PLAN_DIR" APPROVED_CALLS="$APPROVED_CALLS"
-make -f Makefile.math500-jev-recovery continuation-audit PLAN_DIR="$PLAN_DIR"
+make math500-jev-continuation-live PLAN_DIR="$PLAN_DIR" APPROVED_CALLS="$APPROVED_CALLS"
+make math500-jev-continuation-audit PLAN_DIR="$PLAN_DIR"
 ```
 
 This explicitly retries the rejected request once, then processes only unattempted
@@ -150,12 +166,12 @@ If that continuation also stops on a Choice/probability mismatch, prepare a
 further explicit continuation from the **most recent failed plan**:
 
 ```bash
-make -f Makefile.math500-jev-resume resume-prepare SOURCE_PLAN="$SOURCE_PLAN"
+make math500-jev-resume-prepare SOURCE_PLAN="$SOURCE_PLAN"
 # Set PLAN_DIR to the new directory printed above.
-make -f Makefile.math500-jev-resume resume-check PLAN_DIR="$PLAN_DIR"
+make math500-jev-resume-check PLAN_DIR="$PLAN_DIR"
 # Set APPROVED_CALLS to the exact additional_paid_calls value after reviewing it.
-make -f Makefile.math500-jev-resume resume-live PLAN_DIR="$PLAN_DIR" APPROVED_CALLS="$APPROVED_CALLS"
-make -f Makefile.math500-jev-resume resume-audit PLAN_DIR="$PLAN_DIR"
+make math500-jev-resume-live PLAN_DIR="$PLAN_DIR" APPROVED_CALLS="$APPROVED_CALLS"
+make math500-jev-resume-audit PLAN_DIR="$PLAN_DIR"
 ```
 
 This extension validates every earlier segment, copies all accepted selections
@@ -178,15 +194,15 @@ they are not silently treated as equivalent.
 
 ```sh
 # Requires an existing Python 3.12 interpreter; override its path if necessary.
-make -f Makefile.math500-scoring math500-scoring-setup MATH_BOOTSTRAP_PYTHON=python3.12
-make -f Makefile.math500-scoring math500-validate
+make math500-scoring-setup MATH_BOOTSTRAP_PYTHON=python3.12
+make math500-validate
 # Set VALIDATION_RUN to the validation directory printed above.
 # RUN_DIR is the verified generation archive; JEV_PLAN is the completed resume plan.
-make -f Makefile.math500-scoring math500-scoring-prepare \
+make math500-scoring-prepare \
     RUN_DIR="$RUN_DIR" JEV_PLAN="$JEV_PLAN" VALIDATION_RUN="$VALIDATION_RUN"
 # Set SCORING_PLAN to the new scoring-plan directory printed above.
-make -f Makefile.math500-scoring math500-scoring-check SCORING_PLAN="$SCORING_PLAN"
-make -f Makefile.math500-scoring math500-evaluate SCORING_PLAN="$SCORING_PLAN"
+make math500-scoring-check SCORING_PLAN="$SCORING_PLAN"
+make math500-evaluate SCORING_PLAN="$SCORING_PLAN"
 ```
 
 These commands make no Jev requests and do not load generator weights. Setup
@@ -208,23 +224,23 @@ runtime establish the exercised behavior, not flawless grading of arbitrary math
 Raw responses are preserved. Strict evaluation executes full saved source. The separately versioned extraction reanalysis accepts plain Python or the exact contents of one complete Python code fence. It does not repair code. Ambiguous/unclosed blocks remain failures in the denominator. This is a custom full-source test harness, not a claim of the unmodified official completion harness or EvalPlus.
 
 ```sh
-make -f Makefile.humaneval humaneval-image
-make -f Makefile.humaneval humaneval-validate
+make humaneval-image
+make humaneval-validate
 # Set RUN_DIR to your verified local generation archive:
-make -f Makefile.humaneval humaneval-score RUN_DIR="$RUN_DIR"
+make humaneval-score RUN_DIR="$RUN_DIR"
 # Set STRICT_RUN to the completed evaluation printed above:
-make -f Makefile.humaneval humaneval-reanalyze RUN_DIR="$RUN_DIR" STRICT_RUN="$STRICT_RUN"
+make humaneval-reanalyze RUN_DIR="$RUN_DIR" STRICT_RUN="$STRICT_RUN"
 ```
 
 The following selection workflow reuses those answers and their saved extracted-code test results. It requires no GPU or new code execution. Put `TYPESAFE_API_KEY=your_key` in the ignored `.env` file, or set that environment variable. The file is read as data, never executed or printed.
 
 ```sh
-make -f Makefile.humaneval humaneval-jev-prepare RUN_DIR="$RUN_DIR"
+make humaneval-jev-prepare RUN_DIR="$RUN_DIR"
 # Set PLAN_DIR to the directory printed by preparation.
 # Executing the next command sends 164 PAID TypeSafe requests:
-make -f Makefile.humaneval humaneval-jev-live PLAN_DIR="$PLAN_DIR" APPROVED_CALLS=164
+make humaneval-jev-live PLAN_DIR="$PLAN_DIR" APPROVED_CALLS=164
 # Set SCORE_RUN to the completed extracted-code evaluation for this same archive:
-make -f Makefile.humaneval humaneval-jev-evaluate PLAN_DIR="$PLAN_DIR" SCORE_RUN="$SCORE_RUN"
+make humaneval-jev-evaluate PLAN_DIR="$PLAN_DIR" SCORE_RUN="$SCORE_RUN"
 ```
 
 Each Jev request contains one public question and all eight answers in seeded shuffled order. Extractable answers use the exact code substring; extraction failures retain their original response. Hidden tests, canonical solutions and correctness labels never enter the requests. Private evaluation maps Jev's choice back to the original candidate ID and compares it with first-sample, seeded-random and oracle results. Scores after extraction are labeled reanalysis.
@@ -232,17 +248,17 @@ Each Jev request contains one public question and all eight answers in seeded sh
 The live command stops on any error, retains partial evidence and prevents replaying the same batch—even through a newly prepared plan. Do not delete its claim to force a retry. A failed/uncertain billed request needs a reviewed continuation rather than rerunning the entire batch. Token usage and latency are recorded; unknown dollar cost stays null.
 
 For a HumanEval batch stopped specifically by a Choice/probability mismatch,
-use the independent `Makefile.humaneval-jev-recovery` extension. The original
+use `make humaneval-jev-continuation-prepare`. The original
 batch and its frozen files stay unchanged. It supports one explicitly approved
 retry of the rejected request followed by the unattempted questions:
 
 ```sh
-make -f Makefile.humaneval-jev-recovery continuation-prepare SOURCE_PLAN="$SOURCE_PLAN"
+make humaneval-jev-continuation-prepare SOURCE_PLAN="$SOURCE_PLAN"
 # Set PLAN_DIR to the printed continuation-plan directory.
-make -f Makefile.humaneval-jev-recovery continuation-check PLAN_DIR="$PLAN_DIR"
+make humaneval-jev-continuation-check PLAN_DIR="$PLAN_DIR"
 # APPROVED_CALLS must equal additional_paid_calls in that checked plan.
-make -f Makefile.humaneval-jev-recovery continuation-live PLAN_DIR="$PLAN_DIR" APPROVED_CALLS="$APPROVED_CALLS"
-make -f Makefile.humaneval-jev-recovery continuation-evaluate PLAN_DIR="$PLAN_DIR" SCORE_RUN="$SCORE_RUN"
+make humaneval-jev-continuation-live PLAN_DIR="$PLAN_DIR" APPROVED_CALLS="$APPROVED_CALLS"
+make humaneval-jev-continuation-evaluate PLAN_DIR="$PLAN_DIR" SCORE_RUN="$SCORE_RUN"
 ```
 
 Executing the live command authorizes that exact additional paid batch. It keeps
@@ -258,7 +274,8 @@ GSM8K has separate `gsm8k500-dry-run`, `gsm8k500-judge` and `gsm8k500-evaluate` 
 ## Repository and local files
 
 - `src/jev_dllm/`: generators, public request adapters, selectors, private evaluation and operations.
-- `scripts/` and `Makefile*`: command entry points, including independent recovery extensions.
+- `Makefile`: the single command entry point for setup, generation, selection, scoring and recovery.
+- `scripts/`: Python entry points called by the Makefile.
 - `configs/`, `prompts/`, `requirements/`, `data/manifests/`: reproducible experiment settings and provenance.
 - `tests/`: isolation, integrity, parser and workflow checks; mock requests incur no API charges.
 - `docs/`, the research PDF, `reports/`, `artifacts/`, datasets and credentials: local only, ignored by Git.

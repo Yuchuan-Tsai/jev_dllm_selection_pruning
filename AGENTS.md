@@ -17,6 +17,9 @@ candidate. README.md describes the supported experiment commands.
 
 ## Implementation and verification
 
+- Keep all Make targets in the root Makefile; use task-prefixed names for recovery.
+- New implementation locks must use new versioned records. Keep older records and
+  archives unchanged, and use their original code revision to analyze or resume them.
 - Keep reusable logic in src/jev_dllm and command entry points in scripts.
 - The core uses the Python standard library. GPU, mathematical scoring and
   isolated code-execution runtimes have separate pinned dependencies.

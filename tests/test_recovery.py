@@ -213,7 +213,8 @@ class RecoveryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'implementation differs'):
             recovery.check_server_source(self.root, self.plan)
         shutil.copyfile(ROOT / 'scripts/recovery.py', path)
-        core = self.root / 'Makefile'
+        # The shared Makefile is checked in both layers; use a core-only file here.
+        core = self.root / 'src/jev_dllm/reproducibility.py'
         core.write_text(core.read_text() + '\n# changed\n')
         with self.assertRaisesRegex(ValueError, 'Frozen file changed'):
             recovery.check_server_source(self.root, self.plan)

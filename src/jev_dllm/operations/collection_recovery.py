@@ -18,7 +18,7 @@ def upload_plan(root, plan_path, config):
                              check=True, capture_output=True).stdout.decode().split("\0")
     if not set(recovery.EXTENSION_FILES).issubset(tracked):
         raise ValueError("Track and review all recovery implementation files before uploading")
-    # Add only these four extension files; never overwrite frozen code or active inputs.
+    # Transfer recovery code and the shared Makefile from the matching deployment.
     subprocess.run(remote.ssh_command(config, ["test", "-d", config["remote_root"]]), check=True)
     with tempfile.NamedTemporaryFile(mode="w") as listing:
         listing.write("\n".join(recovery.EXTENSION_FILES) + "\n")
@@ -33,7 +33,7 @@ def upload_plan(root, plan_path, config):
                     "-e", shlex.join(["ssh", *remote.SSH_OPTIONS]), str(plan_path.resolve()),
                     f"{config['ssh_host']}:{destination}/{name}"], check=True)
     return {"status": "uploaded", "server_plan": "artifacts/collection-recovery-plans/" + name,
-            "note": "Four additive code files and verified recovery metadata only; no GPU or API work started."}
+            "note": "Recovery code, the shared Makefile and verified recovery metadata only; no GPU or API work started."}
 
 
 def launch(root, plan_path):

@@ -14,7 +14,7 @@ original = previous.original
 sha256 = previous.sha256
 VERSION = "math500_jev_explicit_resume_v1"
 FILES = (*previous.FILES, "src/jev_dllm/experiments/math500_jev_resume.py",
-         "scripts/resume_math500_jev.py", "Makefile.math500-jev-resume")
+         "scripts/resume_math500_jev.py", "Makefile")
 
 
 def implementation(root):

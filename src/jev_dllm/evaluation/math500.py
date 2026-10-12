@@ -18,7 +18,7 @@ POLICY = 'configs/evaluation/math500-math-verify-v1.json'
 CONTROLS = 'tests/fixtures/math500-controls.json'
 WORKER = 'src/jev_dllm/evaluation/math500_worker.py'
 FILES = (POLICY, CONTROLS, WORKER, 'src/jev_dllm/evaluation/math500.py',
-         'scripts/score_math500.py', 'Makefile.math500-scoring', 'requirements/math500-cpu.lock')
+         'scripts/score_math500.py', 'Makefile', 'requirements/math500-cpu.lock')
 sha256 = selection.sha256
 
 

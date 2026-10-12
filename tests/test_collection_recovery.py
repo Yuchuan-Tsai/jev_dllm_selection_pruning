@@ -228,7 +228,8 @@ class CollectionRecoveryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'implementation differs'):
             recovery.check_server_source(self.root, self.plan)
         shutil.copyfile(ROOT / 'scripts/recover_collection.py', path)
-        core = self.root / 'Makefile'
+        # The shared Makefile is checked in both layers; use a core-only file here.
+        core = self.root / 'src/jev_dllm/reproducibility.py'
         core.write_text(core.read_text() + '\n# changed\n')
         with self.assertRaisesRegex(ValueError, 'Pinned collection file changed'):
             recovery.check_server_source(self.root, self.plan)
@@ -261,7 +262,7 @@ class CollectionRecoveryTests(unittest.TestCase):
                 recovery.recover(self.root, self.plan)
             backend.assert_not_called()
 
-    def test_upload_is_additive_and_contains_only_validated_metadata(self):
+    def test_upload_contains_recovery_code_shared_makefile_and_validated_metadata(self):
         calls, transferred = [], []
         def command(args, **kwargs):
             calls.append(args)
@@ -277,7 +278,7 @@ class CollectionRecoveryTests(unittest.TestCase):
             result = operations.upload_plan(self.root, self.plan, config)
             general_upload.assert_not_called()
         self.assertEqual(set(transferred), set(recovery.EXTENSION_FILES))
-        self.assertFalse(set(transferred) & set(collection.locked_paths(self.root)))
+        self.assertEqual(set(transferred) & set(collection.locked_paths(self.root)), {'Makefile'})
         rsync = [args for args in calls if args[0] == 'rsync']
         self.assertEqual(len(rsync), 2)
         self.assertEqual(rsync[1][-2], str(self.plan.resolve()))
