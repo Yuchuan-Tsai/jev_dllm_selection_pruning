@@ -52,3 +52,6 @@ configs/server/local.json
 
 # Isolated CPU mathematical-equivalence runtime
 .venv-math/
+
+# Local agent instructions
+/AGENTS.md
