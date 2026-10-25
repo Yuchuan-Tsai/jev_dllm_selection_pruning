@@ -129,7 +129,7 @@ def fixtures():
         case("stdlib_import", "import math\ndef increment(x): return math.floor(x)+1\n", "passed"),
         case("isolation", """import os, socket
 assert os.getuid() != 0
-assert 'TYPESAFE_API_KEY' not in os.environ
+assert 'JEV_API_KEY' not in os.environ
 assert not os.path.exists('/var/run/docker.sock')
 assert not os.path.exists('/Users')
 try:

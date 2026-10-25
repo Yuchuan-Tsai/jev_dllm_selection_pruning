@@ -29,6 +29,18 @@ class BenchmarkSeparationTests(unittest.TestCase):
         self.assertNotIn("return 1", json.dumps(public))
         self.assertEqual(private[0]["hidden_tests"], "secret tests")
 
+    def test_mbpp_development_uses_only_train_and_validation_ranges(self):
+        rows = [
+            {"task_id": i, "text": f"task {i}", "code": "secret code", "test_list": ["secret test"]}
+            for i in (1, 11, 510, 511, 600, 601, 974)
+        ]
+        public, private = partition("mbpp", rows)
+        self.assertEqual([q["question_id"] for q in public], ["mbpp/511", "mbpp/600", "mbpp/601", "mbpp/974"])
+        self.assertTrue(all(q["split"] == "dev" for q in public))
+        self.assertNotIn("secret code", json.dumps(public))
+        self.assertNotIn("secret test", json.dumps(public))
+        self.assertEqual(len(private), len(public))
+
     def test_duplicate_ids_rejected(self):
         row = {"unique_id": "x", "problem": "p", "answer": "1"}
         with self.assertRaises(ValueError):

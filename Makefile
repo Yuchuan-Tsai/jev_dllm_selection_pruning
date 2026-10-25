@@ -2,11 +2,14 @@ PYTHON ?= .venv/bin/python
 GPU_PYTHON ?= .venv-gpu/bin/python
 RUNTIME_TEST_PYTHON ?= $(GPU_PYTHON)
 SERVER_PYTHON ?= python3.11
+AUTODL_PYTHON ?= python3.12
 CONFIG ?= configs/week01/pilot.json
 QUESTIONS ?= data/processed/gsm8k-dev.json
 REFERENCES ?= data/private/gsm8k-dev-references.json
 SERVER_CONFIG ?= configs/server/local.json
 RUN_DIR ?=
+CANDIDATES ?=
+CANDIDATE_FILE = $(if $(strip $(CANDIDATES)),$(CANDIDATES),$(RUN_DIR)/candidates.jsonl)
 RUN_ID ?=
 SELECTIONS ?=
 SCORER ?= gsm8k_strict_v1
@@ -36,6 +39,7 @@ export GPU_ID
 .PHONY: gsm8k500-check gpu-gsm8k500 gsm8k500-dry-run gsm8k500-judge gsm8k500-evaluate
 .PHONY: test-fast-runtime scoring-check
 .PHONY: fetch-fast-inputs gpu-lock-check gpu-fast-check gpu-fast-diversity gpu-install-locked compare-backends
+.PHONY: gpu-autodl-setup gpu-autodl-install gpu-autodl-check gpu-autodl-fast-check gpu-fast-diversity-autodl
 .PHONY: git-audit smoke-keep smoke-clean processbench-dry-run processbench-live processbench-evaluate help setup doctor check test smoke week1-check fetch-inputs data-fetch data-prepare data-check week1-data check-splits storage gpu-disk gpu-setup gpu-install gpu-check gpu-status gpu-fetch-model gpu-pilot gpu-diversity judge-dry-run judge-live evaluate remote-plan remote-check remote-upload results-pull results-watch results-verify results-clean
 
 help:
@@ -127,6 +131,24 @@ gpu-disk:
 gpu-setup:
 	@umask 077; $(SERVER_PYTHON) -m venv .venv-gpu
 
+# AutoDL PyTorch 2.5.1 / Python 3.12 / CUDA 12.4 image. The venv reuses
+# the image's preinstalled torch; this profile remains provisional until run
+# and captured on the actual A800 instance.
+gpu-autodl-setup:
+	@umask 077; $(AUTODL_PYTHON) -m venv --system-site-packages .venv-gpu
+
+gpu-autodl-install:
+	$(GPU_PYTHON) -c "import platform, sys; assert platform.system() == 'Linux' and platform.machine() == 'x86_64' and sys.version_info[:2] == (3, 12), 'AutoDL profile requires Linux x86_64 and Python 3.12'"
+	$(GPU_PYTHON) -m pip install --only-binary=:all: -r requirements/gpu-autodl-py312.in
+	$(GPU_PYTHON) -m pip check
+
+gpu-autodl-check:
+	$(GPU_PYTHON) scripts/gpu_runtime.py autodl
+	$(GPU_PYTHON) scripts/ops.py gpu-check
+
+gpu-autodl-fast-check:
+	$(GPU_PYTHON) scripts/gpu_runtime.py autodl-fast
+
 gpu-install:
 	$(GPU_PYTHON) -c "import platform, sys; assert platform.system() == 'Linux' and platform.machine() == 'x86_64' and sys.version_info[:2] == (3, 11), 'GPU install profile requires Linux x86_64 and Python 3.11'"
 	@umask 077; mkdir -p .cache/pip-tmp
@@ -154,6 +176,9 @@ gpu-fast-check: gpu-lock-check
 gpu-fast-diversity: gpu-fast-check
 	$(GPU_PYTHON) scripts/ops.py gpu-generate --config configs/week01/fast-diversity.json --questions "$(QUESTIONS)"
 
+gpu-fast-diversity-autodl: gpu-autodl-fast-check
+	$(GPU_PYTHON) scripts/ops.py gpu-generate --config configs/week01/fast-diversity.json --questions "$(QUESTIONS)"
+
 gpu-check:
 	$(GPU_PYTHON) scripts/ops.py gpu-check
 
@@ -170,16 +195,16 @@ gpu-diversity:
 	$(GPU_PYTHON) scripts/ops.py gpu-generate --config configs/week01/diversity.json --questions "$(QUESTIONS)"
 
 judge-dry-run:
-	@test -n "$(RUN_DIR)" || (echo 'Set RUN_DIR to a local generation run directory'; exit 2)
-	$(PYTHON) scripts/jev.py judge-pool --config "$(CONFIG)" --questions "$(QUESTIONS)" --candidates "$(RUN_DIR)/candidates.jsonl"
+	@test -n "$(strip $(RUN_DIR)$(CANDIDATES))" || (echo 'Set RUN_DIR or CANDIDATES to a local candidate pool'; exit 2)
+	$(PYTHON) scripts/jev.py judge-pool --config "$(CONFIG)" --questions "$(QUESTIONS)" --candidates "$(CANDIDATE_FILE)"
 
 judge-live:
-	@test -n "$(RUN_DIR)" || (echo 'Set RUN_DIR to a local generation run directory'; exit 2)
-	$(PYTHON) scripts/jev.py judge-pool --config "$(CONFIG)" --questions "$(QUESTIONS)" --candidates "$(RUN_DIR)/candidates.jsonl" --live --env-file "$(ENV_FILE)"
+	@test -n "$(strip $(RUN_DIR)$(CANDIDATES))" || (echo 'Set RUN_DIR or CANDIDATES to a local candidate pool'; exit 2)
+	$(PYTHON) scripts/jev.py judge-pool --config "$(CONFIG)" --questions "$(QUESTIONS)" --candidates "$(CANDIDATE_FILE)" --live --env-file "$(ENV_FILE)"
 
 evaluate:
-	@test -n "$(RUN_DIR)" || (echo 'Set RUN_DIR to a local generation run directory'; exit 2)
-	$(PYTHON) scripts/jev.py evaluate-pool --config "$(CONFIG)" --questions "$(QUESTIONS)" --candidates "$(RUN_DIR)/candidates.jsonl" --references "$(REFERENCES)" --scorer "$(SCORER)" $(if $(SELECTIONS),--selections "$(SELECTIONS)",)
+	@test -n "$(strip $(RUN_DIR)$(CANDIDATES))" || (echo 'Set RUN_DIR or CANDIDATES to a local candidate pool'; exit 2)
+	$(PYTHON) scripts/jev.py evaluate-pool --config "$(CONFIG)" --questions "$(QUESTIONS)" --candidates "$(CANDIDATE_FILE)" --references "$(REFERENCES)" --scorer "$(SCORER)" $(if $(SELECTIONS),--selections "$(SELECTIONS)",)
 
 compare-backends:
 	@test -n "$(OFFICIAL_RUN_DIR)" -a -n "$(FAST_RUN_DIR)" || (echo 'Set OFFICIAL_RUN_DIR and FAST_RUN_DIR to the verified local archives'; exit 2)

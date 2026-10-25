@@ -109,6 +109,10 @@ def settings(path: Path, root: Path, plan=False):
     interval = config.get("sync_interval_seconds", 60)
     if type(interval) is not int or interval < 10:
         raise ValueError("Sync interval must be at least 10 seconds")
+    include_frozen = config.get("upload_frozen_inputs", False)
+    if type(include_frozen) is not bool:
+        raise ValueError("upload_frozen_inputs must be true or false")
+    config["upload_frozen_inputs"] = include_frozen
     return config
 
 
@@ -161,9 +165,10 @@ def upload(root, config):
             continue
         allowed.append(name)
     # Allow only explicit public inputs; private references never go to the server.
-    allowed += ["data/processed/gsm8k-dev.json", "data/manifests/gsm8k-week01.json", "third_party/llada/generate.py"]
+    allowed += ["data/processed/gsm8k-dev.json", "data/manifests/gsm8k-week01.json",
+                "third_party/llada/generate.py", "requirements/gpu-autodl-py312.in"]
     frozen_config = root / "configs/week01/gsm8k500.json"
-    if frozen_config.exists():
+    if frozen_config.exists() and config.get("upload_frozen_inputs", True):
         from ..experiments.frozen import check_protocol
         profile = json.loads(frozen_config.read_text())
         public_path = profile["datasets"]["questions_path"]
@@ -195,7 +200,7 @@ def operate(root, config, action, run_id=None):
     if action == "remote-plan":
         return {"ssh_host": config["ssh_host"], "remote_root": config["remote_root"],
                 "local_results": config["local_results"], "sync_interval_seconds": config.get("sync_interval_seconds", 60),
-                "upload": "Tracked reusable project files + GSM8K public development and frozen 500-question inputs + verified official/Fast-dLLM source; no reports, private labels, secrets, weights, venvs or runs",
+                "upload": "Tracked reusable project files + GSM8K public development and verified official/Fast-dLLM source; frozen 500-question inputs are opt-in via upload_frozen_inputs=true; no reports, private labels, secrets, weights, venvs or runs",
                 "pull": "All run files; copy-only, no remote deletion",
                 "cleanup": "One terminal run, only after a fresh SHA256 comparison; shared cache is never a cleanup target"}
     if action == "remote-check":

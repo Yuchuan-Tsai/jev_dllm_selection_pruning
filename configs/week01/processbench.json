@@ -1,5 +1,5 @@
 {
-  "model": "jev-1.13.0",
+  "model": "jev-1.13",
   "scope": "limited_processbench_first_error_diagnostic",
   "subsets": {
     "gsm8k": 50,

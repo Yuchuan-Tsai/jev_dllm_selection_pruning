@@ -47,10 +47,10 @@
       }
     },
     "judge": {
-      "model_version": "jev-1.13.0",
-      "api_key_env": "TYPESAFE_API_KEY",
-      "endpoint": "https://api.typesafe.ai/v1/systemone",
-      "failure_policy": "stop_and_record_no_automatic_retry"
+      "model_version": "jev-1.13",
+      "api_key_env": "JEV_API_KEY",
+      "endpoint": "https://jev-ai.org/api/v1/systemone/",
+      "failure_policy": "stop_and_record; retry_transient_with_idempotency_key"
     },
     "datasets": {
       "name": "humaneval",

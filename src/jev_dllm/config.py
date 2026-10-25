@@ -98,7 +98,7 @@ def validate_pilot(config: dict) -> list[str]:
         (f"backends.{selected}.code_commit", backend["code_commit"], r"[0-9a-f]{40}"),
         (f"backends.{selected}.source_pin", backend.get("source_sha256") if selected == "official_llada"
              else backend.get("source_manifest_sha256"), r"[0-9a-f]{64}"),
-        ("judge.model_version", config["judge"]["model_version"], r"jev-\d+\.\d+\.\d+"),
+        ("judge.model_version", config["judge"]["model_version"], r"jev-\d+\.\d+"),
         ("datasets.manifest_sha256", config["datasets"]["manifest_sha256"], r"[0-9a-f]{64}"),
     ]:
         if value is None:

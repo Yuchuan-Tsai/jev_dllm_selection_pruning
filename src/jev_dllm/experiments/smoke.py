@@ -67,7 +67,7 @@ def run(root: Path, output: Path | None = None) -> Path:
     evaluate_pools(run_dir / "questions.json", run_dir / "candidates.jsonl",
                    run_dir / "evaluation_private/references.json", run_dir / "selection_checks")
     judge_pools(run_dir / "questions.json", run_dir / "candidates.jsonl",
-                root / "prompts/jev_final.txt", run_dir / "selection_checks", "jev-1.13.0")
+                root / "prompts/jev_final.txt", run_dir / "selection_checks", "jev-1.13")
     cost = asdict(CostRecord(end_to_end_seconds=time.perf_counter() - started, api_cost_usd=0.0))
     _write_json(run_dir / "costs.json", {"mode": "synthetic_smoke_only", **cost})
     manifest = json.loads((run_dir / "manifest.json").read_text())

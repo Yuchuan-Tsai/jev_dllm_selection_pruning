@@ -1,6 +1,6 @@
 # Jev × dLLM
 
-This project tests whether TypeSafe Jev can improve answers from a fixed LLaDA-8B-Instruct generator by choosing among completed samples. The server generates answers; the local computer prepares public-only Jev requests and privately evaluates the chosen IDs. Jev runs through the hosted TypeSafe API. It does not modify the selected answer.
+This project tests whether Jev can improve answers from a fixed LLaDA-8B-Instruct generator by choosing among completed samples. The server generates answers; the local computer prepares public-only Jev requests and privately evaluates the chosen IDs. Jev runs through the Jev AI decision API. It does not modify the selected answer.
 
 ```text
 Public questions -> LLaDA / Fast-dLLM on a GPU -> saved candidate pools
@@ -31,10 +31,12 @@ matching version with `make remote-upload` before using task-specific transfers.
 
 ## Setup and local checks
 
-Python 3.11+ is required for the dependency-free local core. The GPU environment uses the separately pinned Linux/Python 3.11 requirements. HumanEval code execution uses an isolated, pinned Docker image. Optional MATH500 scoring uses a separate Python 3.12 CPU environment with a wheel-hash lock.
+Python 3.11+ is required for the dependency-free local core. The established GPU lock targets Linux/Python 3.11. A provisional AutoDL path is also provided for the PyTorch 2.5.1 / Python 3.12 / CUDA 12.4 image; it reuses the image's PyTorch and is not a frozen experiment environment until validated and captured on the A800. HumanEval code execution uses an isolated, pinned Docker image. Optional MATH500 scoring uses a separate Python 3.12 CPU environment with a wheel-hash lock.
+
+The optional device resolver in `jev_dllm.backends.device` accepts `cpu`, `mps`, `cuda` or `auto`. CPU development requires no PyTorch install; requesting MPS or CUDA checks the installed PyTorch runtime.
 
 ```sh
-make setup
+python3.11 -m venv .venv
 make doctor check test smoke
 make week1-data
 make fetch-fast-inputs
@@ -49,9 +51,12 @@ Data preparation uses pinned public sources and writes ignored local files. Keep
 | GSM8K | 20 development + 500 held-out questions | Generation, numeric scoring, baseline and Jev selection |
 | MATH500 | 500 questions | Answer collection, raw-answer Jev selection and frozen offline mathematical-equivalence scoring |
 | HumanEval | 164 programming tasks | Answer collection, isolated strict/extracted-code evaluation, Jev selection |
+| MBPP | 464 train + validation tasks | Separate code development pool; IDs 511–974 only, with reference code/tests private |
 | ProcessBench | 50 GSM8K + 50 MATH examples | Separate first-error diagnostic; not answer generation |
 
 Public inference inputs live in `data/processed/`; reference answers and hidden tests live in `data/private/`. Neither is tracked. Source revisions, hashes and selected IDs are tracked in `data/manifests/`. Do not treat a diagnostic subset as the full benchmark.
+
+MBPP uses the pinned Google Research source and its documented ID ranges: IDs 511–600 (validation) and 601–974 (train) are development data; IDs 1–10 (few-shot) and 11–510 (test) are excluded. The development questions are prepared as `data/processed/mbpp-dev.json`; reference code and tests are kept in `data/private/mbpp-dev-references.json`. No candidate-code execution is wired for MBPP yet.
 
 On the local computer, after configuring SSH:
 
@@ -60,6 +65,8 @@ make remote-plan
 make remote-upload
 make benchmarks-check benchmarks-upload
 ```
+
+`remote-upload` sends the GSM8K development input by default. It skips the frozen 500-question held-out input so ordinary code changes do not require changing the held-out protocol record. Set `"upload_frozen_inputs": true` in the ignored `configs/server/local.json` only when deploying that explicitly frozen workflow; its protocol checks must pass unchanged.
 
 On the server, enter its project directory, set `JEV_SHARED_HUB_CACHE` to the existing model cache and inspect GPU availability. Supply one available A100 index to the chosen command:
 
@@ -72,6 +79,24 @@ make start-math500 GPU_ID=5
 ```
 
 The `start-*` targets create separate tmux sessions and refuse a duplicate session name. Foreground alternatives are `gpu-humaneval` and `gpu-math500`. Generation creates a new uniquely named run each time. These example GPU indices are not allocations. The current BF16 profiles require native BF16 hardware; V100 needs a separately reviewed precision protocol.
+
+### AutoDL A800 image
+
+For the AutoDL **PyTorch 2.5.1 / Python 3.12 / CUDA 12.4** image, the existing Python 3.11 lock and `gpu-fast-check` are not applicable. Keep the image's CUDA-enabled PyTorch by creating a virtual environment that sees system packages, then install the pinned model-library requirements:
+
+```sh
+cd /root/autodl-tmp/jev_dllm_selection_pruning
+mkdir -p /root/autodl-tmp/huggingface/hub
+export JEV_SHARED_HUB_CACHE=/root/autodl-tmp/huggingface/hub
+make gpu-autodl-setup AUTODL_PYTHON=python3.12
+make gpu-autodl-install
+make gpu-autodl-check GPU_ID=0
+make gpu-fetch-model CONFIG=configs/week01/diversity.json GPU_ID=0
+make gpu-diversity GPU_ID=0
+make gpu-fast-diversity-autodl GPU_ID=0
+```
+
+`gpu-autodl-check` verifies the image package versions and CUDA/BF16 visibility. `gpu-fast-diversity-autodl` runs the Fast-dLLM synthetic compatibility check before generation. Both checks are prerequisites, not evidence that full LLaDA generation has completed. The AutoDL environment remains provisional until the real GPU runs succeed and their complete dependency captures are reviewed. The pre-existing Python 3.11 lock and frozen GSM8K protocol records are retained unchanged.
 
 On the local computer, copy outputs and verify a terminal run before analysis:
 
@@ -126,7 +151,7 @@ RUN_DIR="artifacts/downloads/lab/$RUN_ID"
 PLAN_DIR="artifacts/runs/math500-jev-plan-$RUN_ID"
 make math500-jev-prepare RUN_DIR="$RUN_DIR" PLAN_DIR="$PLAN_DIR"
 make math500-jev-check PLAN_DIR="$PLAN_DIR"
-# This command sends 500 PAID requests using TYPESAFE_API_KEY from the ignored .env:
+# This command sends 500 PAID requests using JEV_API_KEY from the ignored .env:
 make math500-jev-live PLAN_DIR="$PLAN_DIR" APPROVED_CALLS=500
 make math500-jev-audit PLAN_DIR="$PLAN_DIR"
 ```
@@ -135,10 +160,12 @@ Each request contains one public question and its eight original answers in
 seeded shuffled order. All IDs and raw text remain unchanged, including empty or
 truncated answers. No extraction, filtering or repair occurs. References and
 correctness labels stay local. Preparation/checking are offline; only `live`
-contacts TypeSafe. A repeated preparation at the same destination rechecks and
+contacts Jev AI. A repeated preparation at the same destination rechecks and
 reuses the unchanged plan. A repeated paid launch is blocked, including through
 a new plan directory for the same batch. Errors retain evidence and stop without
-automatic retries; inspect the failure before attempting a continuation.
+automatic retries for nontransient failures. The Jev client retries only
+documented transient statuses with the same idempotency key; inspect other
+failures before attempting a continuation.
 
 The final audit verifies the raw responses and selected original IDs, saves
 `selected-answers.jsonl`, and reports token usage and request time. It does not
@@ -232,12 +259,12 @@ make humaneval-score RUN_DIR="$RUN_DIR"
 make humaneval-reanalyze RUN_DIR="$RUN_DIR" STRICT_RUN="$STRICT_RUN"
 ```
 
-The following selection workflow reuses those answers and their saved extracted-code test results. It requires no GPU or new code execution. Put `TYPESAFE_API_KEY=your_key` in the ignored `.env` file, or set that environment variable. The file is read as data, never executed or printed.
+The following selection workflow reuses those answers and their saved extracted-code test results. It requires no GPU or new code execution. Put `JEV_API_KEY=your_key` in the ignored `.env` file, or set that environment variable. The file is read as data, never executed or printed. Live requests use `https://jev-ai.org/api/v1/systemone/` with model `jev-1.13`; transient HTTP failures retry with a stable idempotency key.
 
 ```sh
 make humaneval-jev-prepare RUN_DIR="$RUN_DIR"
 # Set PLAN_DIR to the directory printed by preparation.
-# Executing the next command sends 164 PAID TypeSafe requests:
+# Executing the next command sends 164 PAID Jev AI requests:
 make humaneval-jev-live PLAN_DIR="$PLAN_DIR" APPROVED_CALLS=164
 # Set SCORE_RUN to the completed extracted-code evaluation for this same archive:
 make humaneval-jev-evaluate PLAN_DIR="$PLAN_DIR" SCORE_RUN="$SCORE_RUN"
@@ -262,9 +289,9 @@ make humaneval-jev-continuation-evaluate PLAN_DIR="$PLAN_DIR" SCORE_RUN="$SCORE_
 ```
 
 Executing the live command authorizes that exact additional paid batch. It keeps
-the accepted prefix unchanged, resends no previously accepted question, permits
-no further automatic retries and blocks duplicate launches across plans for the
-same failed batch. The amended evaluation records the rejected request, total
+the accepted prefix unchanged, resends no previously accepted question, retries
+transient transport errors idempotently, and blocks duplicate launches across
+plans for the same failed batch. The amended evaluation records the rejected request, total
 attempts, token usage and latency separately from answer accuracy. It is not
 reported as an uninterrupted no-retry run. Full-batch accuracy is unavailable
 until the continuation is complete.

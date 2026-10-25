@@ -47,13 +47,13 @@
   },
   "judge": {
     "name": "Jev",
-    "model_version": "jev-1.13.0",
-    "api_contract_version": "https://docs.typesafe.ai/api (reviewed 2026-10-08)",
-    "api_key_env": "TYPESAFE_API_KEY",
+    "model_version": "jev-1.13",
+    "api_contract_version": "https://jev-ai.org/jev-api/",
+    "api_key_env": "JEV_API_KEY",
     "request_concurrency": 1,
     "timeout_seconds": 60,
     "failure_policy": "record_error_no_silent_fallback",
-    "endpoint": "https://api.typesafe.ai/v1/systemone"
+    "endpoint": "https://jev-ai.org/api/v1/systemone/"
   },
   "datasets": {
     "manifest_sha256": null,

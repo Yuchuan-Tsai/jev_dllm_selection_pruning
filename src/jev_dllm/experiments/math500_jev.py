@@ -12,7 +12,7 @@ from ..reproducibility import fingerprint, trajectory_seed
 from ..operations.remote import snapshot_digest, valid_run_id
 
 VERSION = "math500_raw_jev_v1"
-MODEL = "jev-1.13.0"
+MODEL = "jev-1.13"
 SEED = 20261008
 PROMPT = "prompts/jev_final.txt"
 FILES = ("src/jev_dllm/experiments/math500_jev.py", "scripts/judge_math500.py", "Makefile", PROMPT,

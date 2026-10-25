@@ -3,5 +3,6 @@
   "remote_root": "/home/YOUR_USERNAME/jev_dllm_selection_pruning",
   "local_results": "artifacts/downloads/lab",
   "sync_interval_seconds": 60,
-  "remote_python": ".venv-gpu/bin/python"
+  "remote_python": ".venv-gpu/bin/python",
+  "upload_frozen_inputs": false
 }

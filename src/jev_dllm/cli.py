@@ -64,7 +64,7 @@ def main(argv: list[str] | None = None) -> int:
                     for m in ("torch", "transformers", "datasets")},
                 "real_generator_adapter": "official_llada implemented; see reports/weekly/week01.md for server evidence",
                 "jev_transport": "Choice HTTP adapter implemented; see reports/weekly/week01.md for live evidence",
-                "typesafe_api_key_present": bool(os.environ.get("TYPESAFE_API_KEY")),
+                "jev_api_key_present": bool(os.environ.get("JEV_API_KEY")),
                 "note": "Package presence does not establish CUDA/BF16/model readiness."}, indent=2))
         elif args.command == "gsm8k500-check":
             from .experiments import frozen

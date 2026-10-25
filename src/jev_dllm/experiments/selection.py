@@ -88,7 +88,7 @@ def judge_pools(questions_path: Path, candidates_path: Path, prompt_path: Path,
                 "questions_sha256": fingerprint([asdict(q) for q in questions]),
                 "pools_sha256": fingerprint({k: [asdict(c) for c in v] for k, v in pools.items()}),
                 "prompt_sha256": fingerprint(instructions), "api_cost_usd": 0.0 if not live else None,
-                "note": "No automatic retries; unknown billing remains null. Dry-run has no Jev result."}
+                "note": "Transient retries use a stable idempotency key; unknown billing remains null. Dry-run has no Jev result."}
     if protocol is not None:
         manifest["protocol"] = protocol
     write_json(run_dir / "manifest.json", manifest)
@@ -100,10 +100,12 @@ def judge_pools(questions_path: Path, candidates_path: Path, prompt_path: Path,
                     manifest["attempted_calls"] += 1
                     write_json(run_dir / "manifest.json", manifest)
                     result = client.select(row["body"])
+                    manifest["attempted_calls"] += max(0, result.get("api_attempts", 1) - 1)
                     stream.write(json.dumps({"question_id": row["question_id"], **result}) + "\n")
                     stream.flush()
                     manifest["successful_calls"] += 1
         except Exception as exc:
+            manifest["attempted_calls"] += max(0, getattr(exc, "api_attempts", 1) - 1)
             if hasattr(exc, "raw_response"):
                 write_json(run_dir / "failed_response.json", {"question_id": row["question_id"],
                            "raw_response_json": json.dumps(exc.raw_response, ensure_ascii=False),

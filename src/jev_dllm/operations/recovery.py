@@ -17,7 +17,9 @@ def upload_plan(root, plan_path, config):
                              check=True, capture_output=True).stdout.decode().split("\0")
     if not set(recovery.EXTENSION_FILES).issubset(tracked):
         raise ValueError("Track and review all recovery implementation files before uploading")
-    remote.upload(root, config)
+    # GSM8K candidate recovery is an explicit held-out operation; include the
+    # exact frozen public question file after the normal protocol validation.
+    remote.upload(root, {**config, "upload_frozen_inputs": True})
     destination = config["remote_root"] + "/artifacts/recovery-plans"
     subprocess.run(remote.ssh_command(config, ["mkdir", "-p", destination]), check=True)
     name = plan["source_run_id"] + ".json"

@@ -1,0 +1,6 @@
+# Provisional AutoDL image profile: PyTorch 2.5.1 / Python 3.12 / CUDA 12.4.
+# PyTorch comes from the selected AutoDL image and is intentionally not reinstalled.
+# Resolve and capture the full environment on the actual A800 before treating it
+# as a frozen experimental dependency lock.
+transformers==4.38.2
+numpy==1.26.4

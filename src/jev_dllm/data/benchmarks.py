@@ -28,7 +28,8 @@ def write_unchanged(path: Path, raw: bytes):
 
 def verify_raw(path: Path, source: dict):
     raw = path.read_bytes()
-    if len(raw) != source["bytes"] or hashlib.sha256(raw).hexdigest() != source["sha256"]:
+    if (("bytes" in source and len(raw) != source["bytes"])
+            or ("sha256" in source and hashlib.sha256(raw).hexdigest() != source["sha256"])):
         raise ValueError(f"Input differs from recorded source: {path.name}")
     return raw
 
@@ -40,12 +41,16 @@ def fetch(root: Path, catalog: dict):
             if not path.exists():
                 with urlopen(source["url"], timeout=60) as response:
                     # All sources are small text datasets; fail on an unexpected large response.
-                    raw = response.read(source["bytes"] + 1)
-                if len(raw) != source["bytes"] or hashlib.sha256(raw).hexdigest() != source["sha256"]:
+                    raw = response.read(source.get("bytes", source.get("max_bytes", 2_000_000)) + 1)
+                if "bytes" in source and len(raw) != source["bytes"]:
+                    raise ValueError(f"Downloaded input has an unexpected size: {path.name}")
+                if len(raw) > source.get("max_bytes", len(raw)):
+                    raise ValueError(f"Downloaded input exceeds the configured size limit: {path.name}")
+                if "sha256" in source and hashlib.sha256(raw).hexdigest() != source["sha256"]:
                     raise ValueError(f"Downloaded input failed verification: {path.name}")
                 write_unchanged(path, raw)
             verify_raw(path, source)
-            print(f"Verified {source['path']} ({source['bytes']} bytes)")
+            print(f"Verified {source['path']} ({(root / source['path']).stat().st_size} bytes)")
 
 
 def source_rows(root: Path, source: dict):
@@ -70,6 +75,16 @@ def partition(name: str, rows: list[dict]):
             question = Question(qid, name, "heldout", row["prompt"])
             reference = {"question_id": qid, "entry_point": row["entry_point"],
                          "hidden_tests": row["test"], "canonical_solution": row["canonical_solution"]}
+        elif name == "mbpp":
+            task_id = int(row["task_id"])
+            if not 511 <= task_id <= 974:
+                continue
+            qid = f"mbpp/{task_id}"
+            question = Question(qid, name, "dev", row["text"])
+            reference = {"question_id": qid, "reference_code": row["code"],
+                         "test_setup_code": row.get("test_setup_code", ""),
+                         "tests": row.get("test_list", []),
+                         "challenge_tests": row.get("challenge_test_list", [])}
         else:
             raise ValueError("Unknown generation benchmark")
         if not question.prompt.strip():
@@ -121,6 +136,31 @@ def prepare(root: Path, catalog: dict):
             "heldout_count": len(public), "dev_count": 0,
             "question_ids": [q["question_id"] for q in public],
             "development_status": "Separate development source still required; do not tune on this heldout set"})
+    mbpp = specs["mbpp"]
+    mbpp_rows = source_rows(root, mbpp["sources"][0])
+    mbpp_public, mbpp_private = partition("mbpp", mbpp_rows)
+    mbpp_train = [q for q in mbpp_public if 601 <= int(q["question_id"].split("/")[1]) <= 974]
+    mbpp_validation = [q for q in mbpp_public if 511 <= int(q["question_id"].split("/")[1]) <= 600]
+    if len(mbpp_public) != 464 or len(mbpp_train) != 374 or len(mbpp_validation) != 90:
+        raise ValueError("MBPP official development ID ranges did not produce 374 train and 90 validation tasks")
+    source = mbpp["sources"][0]
+    mbpp_source_record = {**source, "bytes": (root / source["path"]).stat().st_size,
+                          "sha256": hashlib.sha256((root / source["path"]).read_bytes()).hexdigest()}
+    humaneval_questions = json.loads((root / "data/processed/humaneval-heldout.json").read_text())
+    humaneval_prompts = {_prompt_key(q["prompt"]) for q in humaneval_questions}
+    mbpp_exact_humaneval_overlap = [q["question_id"] for q in mbpp_public
+                                    if _prompt_key(q["prompt"]) in humaneval_prompts]
+    save_outputs(root, "mbpp", {
+        "data/processed/mbpp-dev.json": mbpp_public,
+        "data/private/mbpp-dev-references.json": mbpp_private,
+    }, {"revision": mbpp["revision"], "sources": [mbpp_source_record],
+        "dev_count": len(mbpp_public), "train_count": len(mbpp_train),
+        "validation_count": len(mbpp_validation), "question_ids": [q["question_id"] for q in mbpp_public],
+        "split_policy": "official task IDs 511-600 validation and 601-974 train; excludes 1-10 few-shot and 11-510 test",
+        "exact_prompt_overlap_with_humaneval": mbpp_exact_humaneval_overlap,
+        "semantic_near_duplicate_review": "pending; normalized exact overlap is not a semantic review",
+        "heldout_humaneval_used": False,
+        "execution_status": "Reference tests are private; candidate code execution requires a future isolated worker"})
     # Record exact overlaps without exposing labels or treating diagnostics as selector data.
     protected = set()
     for name in ("gsm8k", "math500"):
@@ -157,9 +197,15 @@ def audit(root: Path, catalog: dict):
         for source in spec["sources"]:
             verify_raw(root / source["path"], source)
         manifest = json.loads((root / f"data/manifests/{name}-week01.json").read_text())
+        manifest_sources = manifest.get("sources", [])
+        for source in manifest_sources if isinstance(manifest_sources, list) else []:
+            if source.get("path") in {s["path"] for s in spec["sources"]} and "sha256" in source:
+                raw = (root / source["path"]).read_bytes()
+                if len(raw) != source["bytes"] or hashlib.sha256(raw).hexdigest() != source["sha256"]:
+                    raise ValueError(f"Raw source differs from prepared manifest: {source['path']}")
         for relative, digest in manifest["files"].items():
             if hashlib.sha256((root / relative).read_bytes()).hexdigest() != digest:
                 raise ValueError(f"Prepared file differs from manifest: {relative}")
-        result[name] = {"verified_files": len(manifest["files"]), "raw_bytes": sum(s["bytes"] for s in spec["sources"]),
+        result[name] = {"verified_files": len(manifest["files"]), "raw_bytes": sum((root / s["path"]).stat().st_size for s in spec["sources"]),
                         "scoring_implementation_available": name in {"gsm8k", "processbench"}}
     return result

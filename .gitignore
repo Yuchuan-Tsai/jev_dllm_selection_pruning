@@ -1,21 +1,53 @@
+# OS metadata
 .DS_Store
-.venv/
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+Desktop.ini
+
+# Python environments, caches, and build outputs
+.venv*/
+venv/
+/env/
 __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
 .ruff_cache/
+.mypy_cache/
+.tox/
+.nox/
+.hypothesis/
+.ipynb_checkpoints/
 build/
 dist/
+
+# Local credentials and machine-specific SSH/server configuration
 .env
 .env.*
 !.env.example
 *.pem
 *.key
+/id_rsa
+/id_ed25519
+/configs/server/local.json
+/configs/server/*.local.json
+
+# Downloaded model weights and caches
 .cache/
 models/
-third_party/*
-!third_party/README.md
+huggingface/
+wandb/
+tensorboard/
+*.safetensors
+*.pt
+*.pth
+*.ckpt
+
+# Downloaded/raw, processed, and private benchmark data
 data/raw/*
 !data/raw/.gitkeep
 data/processed/*
@@ -23,35 +55,33 @@ data/processed/*
 data/private/*
 !data/private/.gitkeep
 
-# GPU environments, per-machine settings, and local result archives
-.venv-gpu/
-configs/server/local.json
-
-# Local machine-specific server directory record
-/docs/*.local.md
-
-# All experiment outputs and written results stay local.
+# Per-run outputs and transient diagnostics; reviewed summaries remain shareable
 /artifacts/*
-/reports/*
+/reports/generated/
+/reports/runs/
 /results/
 /outputs/
 /output/
 /logs/
-# Personal research documentation stays local, including blank templates.
-/docs/
-/Jev × dLLM 10-Week Timeline.pdf
-/configs/README.md
-/data/README.md
+/coverage/
+/htmlcov/
+/.coverage*
+/coverage.xml
+*.log
+nohup.out
+*.swp
+*~
+/tmp/
+/temp/
 
-# Unused future interfaces and detailed module notes remain local.
+# Local-only notes; project plans and decisions are shared
+/docs/*.local.md
+
+# Fetched third-party source; revisions and fetch instructions live in README
+third_party/*
+!third_party/README.md
+
+# Optional future interfaces not yet part of the implementation
 /src/jev_dllm/pruning/
 /src/jev_dllm/backends/base.py
 /src/jev_dllm/judges/base.py
-/src/jev_dllm/**/README.md
-/prompts/README.md
-
-# Isolated CPU mathematical-equivalence runtime
-.venv-math/
-
-# Local agent instructions
-/AGENTS.md

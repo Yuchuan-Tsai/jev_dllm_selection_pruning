@@ -33,8 +33,8 @@ def main():
             # Validate before reading credentials, and before any network request.
             workflow.inspect(root, path(args.plan_dir))
             load_api_key(path(args.env_file))
-            if not os.environ.get("TYPESAFE_API_KEY"):
-                raise ValueError("Set TYPESAFE_API_KEY in the ignored .env file")
+            if not os.environ.get("JEV_API_KEY"):
+                raise ValueError("Set JEV_API_KEY in the ignored .env file")
             out = workflow.execute(root, path(args.plan_dir), args.approved_calls)
         else:
             if not args.plan_dir or not args.score_run:

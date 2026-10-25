@@ -52,6 +52,23 @@
         }
       ]
     },
+    "mbpp": {
+      "revision": "f82046ba5aabbbb427dbfd38a254d26bff08b533",
+      "role": "separate_code_development_only",
+      "sources": [
+        {
+          "url": "https://raw.githubusercontent.com/google-research/google-research/f82046ba5aabbbb427dbfd38a254d26bff08b533/mbpp/mbpp.jsonl",
+          "path": "data/raw/mbpp.jsonl",
+          "format": "jsonl",
+          "rows": 974,
+          "max_bytes": 2000000,
+          "revision": "f82046ba5aabbbb427dbfd38a254d26bff08b533"
+        }
+      ],
+      "development_task_id_ranges": {"validation": [511, 600], "train": [601, 974]},
+      "excluded_task_id_ranges": {"few_shot": [1, 10], "heldout_test": [11, 510]},
+      "readiness": "prompts_and_private_references_only; no candidate-code executor"
+    },
     "processbench": {
       "revision": "3bdcd5371ed567559a78f559c01c13a6deee7604",
       "role": "separate_diagnostic",

@@ -14,7 +14,7 @@ from ..reproducibility import fingerprint, trajectory_seed
 from ..selection.baselines import random_choice
 
 VERSION = "humaneval_extracted_jev_v1"
-MODEL = "jev-1.13.0"
+MODEL = "jev-1.13"
 SEED = 20261008
 PROMPT = "prompts/jev_humaneval.txt"
 FILES = ("src/jev_dllm/experiments/humaneval_jev.py", "scripts/judge_humaneval.py", PROMPT,

@@ -37,8 +37,8 @@ def main():
                 if args.approved_calls != amendment['additional_paid_calls']:
                     parser.error("--approved-calls must equal the exact planned additional count")
                 load_api_key(path(args.env_file))
-                if not os.environ.get("TYPESAFE_API_KEY"):
-                    raise ValueError("Set TYPESAFE_API_KEY in the ignored .env file")
+                if not os.environ.get("JEV_API_KEY"):
+                    raise ValueError("Set JEV_API_KEY in the ignored .env file")
                 out = workflow.execute(root, plan, args.approved_calls)
             else:
                 out = workflow.audit_live(root, plan)
