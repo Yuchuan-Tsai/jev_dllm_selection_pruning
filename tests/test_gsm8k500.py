@@ -1,5 +1,6 @@
 """Offline freeze, archive integrity and data-boundary regression checks."""
 import json
+import os
 from pathlib import Path
 import shutil
 import sys
@@ -167,6 +168,23 @@ class FrozenGSM8KTests(unittest.TestCase):
                 frozen.check_hardware(self.config, SimpleNamespace(cuda=cuda))
         cuda = SimpleNamespace(is_available=lambda: True, device_count=lambda: 1, get_device_name=lambda _: 'NVIDIA A100-SXM4-80GB')
         frozen.check_hardware(self.config, SimpleNamespace(cuda=cuda))
+
+    def test_listed_substitute_gpu_requires_exact_opt_in(self):
+        a800 = SimpleNamespace(cuda=SimpleNamespace(is_available=lambda: True, device_count=lambda: 1,
+                                                     get_device_name=lambda _: 'NVIDIA A800-SXM4-80GB'))
+        for setting in (None, '1', 'NVIDIA A800 80GB PCIe'):
+            with self.subTest(setting=setting), patch.dict(os.environ, {}, clear=False):
+                os.environ.pop('JEV_HARDWARE_SUBSTITUTE', None)
+                if setting is not None:
+                    os.environ['JEV_HARDWARE_SUBSTITUTE'] = setting
+                with self.assertRaises(RuntimeError):
+                    frozen.check_hardware(self.config, a800)
+        with patch.dict(os.environ, {'JEV_HARDWARE_SUBSTITUTE': 'NVIDIA A800-SXM4-80GB'}):
+            frozen.check_hardware(self.config, a800)
+            unlisted = SimpleNamespace(cuda=SimpleNamespace(is_available=lambda: True, device_count=lambda: 1,
+                                                             get_device_name=lambda _: 'NVIDIA H100 80GB HBM3'))
+            with self.assertRaises(RuntimeError):
+                frozen.check_hardware(self.config, unlisted)
 
     def test_upload_includes_only_public_subset_not_private_references(self):
         sampler = self.root / 'third_party/llada/generate.py'

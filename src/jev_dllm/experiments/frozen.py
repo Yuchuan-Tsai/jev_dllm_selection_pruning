@@ -1,13 +1,17 @@
 """Enforce the scoped GSM8K-500 freeze before generation or held-out analysis."""
 import hashlib
 import json
+import os
 from pathlib import Path
 from ..config import validate
 from ..reproducibility import fingerprint, trajectory_seed
 
 PROFILE = "configs/week01/gsm8k500.json"
-RECORD = "configs/week01/gsm8k500-freeze-v2.json"
+RECORD = "configs/week01/gsm8k500-freeze-v3.json"
 PHASE = "gsm8k500_heldout_selection"
+# Opt-in substitutes for the pinned GPU. The run must name the exact device in
+# JEV_HARDWARE_SUBSTITUTE; archives record the actual GPU name as the deviation.
+HARDWARE_SUBSTITUTES = {"NVIDIA A100-SXM4-80GB": ("NVIDIA A800-SXM4-80GB", "NVIDIA A800 80GB PCIe")}
 
 
 def sha256(path: Path) -> str:
@@ -98,6 +102,13 @@ def check_evaluation(config, references_path, scorer, selections_path=None, prov
 
 
 def check_hardware(config, torch):
-    if (not torch.cuda.is_available() or torch.cuda.device_count() != 1
-            or torch.cuda.get_device_name(0) != config["runtime"]["hardware"]):
-        raise RuntimeError("Frozen GSM8K-500 profile requires exactly one NVIDIA A100-SXM4-80GB")
+    pinned = config["runtime"]["hardware"]
+    if not torch.cuda.is_available() or torch.cuda.device_count() != 1:
+        raise RuntimeError(f"Frozen profile requires exactly one visible {pinned}")
+    actual = torch.cuda.get_device_name(0)
+    if actual == pinned:
+        return
+    if actual in HARDWARE_SUBSTITUTES.get(pinned, ()) and os.environ.get("JEV_HARDWARE_SUBSTITUTE") == actual:
+        return
+    raise RuntimeError(f"Frozen profile requires {pinned}; found {actual}. A listed substitute "
+                       "runs only when JEV_HARDWARE_SUBSTITUTE names that exact device")
