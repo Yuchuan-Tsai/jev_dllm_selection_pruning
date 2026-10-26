@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "scope": "week02_development_pools",
+  "task": "math",
+  "base_profile": {
+    "path": "configs/collection/math500.json",
+    "key": "backend_profile",
+    "sha256": "21548753438b8d8cfd49662d412b2b6c8cb30d0ad096b942155f96d81ad464cb"
+  },
+  "questions": {
+    "path": "data/processed/math-w2dev.json",
+    "sha256": "460dd2abedd6f109e0ca4891ad5b122da1194965da52ad5407316269a5437a78",
+    "count": 200
+  },
+  "candidates_per_question": 16,
+  "checkpoint_completed_blocks": [
+    4,
+    8,
+    12
+  ],
+  "settings_note": "Week 1 MATH500 collection settings (Fast-dLLM, length 512, block 32, temperature 1.0). Only N and trajectory recording differ from Week 1; candidate i uses trajectory_seed(master_seed, question_id, i), so i < 8 shares Week 1 seeds."
+}

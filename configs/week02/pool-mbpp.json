@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "scope": "week02_development_pools",
+  "task": "mbpp",
+  "base_profile": {
+    "path": "configs/collection/humaneval.json",
+    "key": "backend_profile",
+    "sha256": "bb6c246733ae47f86c13c8c2e3edb69b494cfdc8c0d08425d7188dbda5ffdd83"
+  },
+  "questions": {
+    "path": "data/processed/mbpp-w2dev.json",
+    "sha256": "f56af9cce54f28aee8b6b05b02f4080024a6a7ecf8193133a53c6cb9a4540e2c",
+    "count": 200
+  },
+  "candidates_per_question": 16,
+  "checkpoint_completed_blocks": [
+    4,
+    8,
+    12
+  ],
+  "settings_note": "Week 1 HumanEval collection settings and prompt (Fast-dLLM, length 512, block 32, temperature 1.0); MBPP is a HumanEval-style proxy. Only N and trajectory recording differ from Week 1; candidate i uses trajectory_seed(master_seed, question_id, i), so i < 8 shares Week 1 seeds."
+}

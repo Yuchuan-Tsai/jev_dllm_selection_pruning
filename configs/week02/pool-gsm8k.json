@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "scope": "week02_development_pools",
+  "task": "gsm8k",
+  "base_profile": {
+    "path": "configs/week01/gsm8k500.json",
+    "key": null,
+    "sha256": "9b085b5afc4ef94b01ce002f4dfc292a2c47588fcaaa50b336491bf7f8a8cb54"
+  },
+  "questions": {
+    "path": "data/processed/gsm8k-w2dev.json",
+    "sha256": "6f524234d29cb0e2e27cbe96ea6bb7dbf96fcc12d09548b270cb23e5aa5fe303",
+    "count": 200
+  },
+  "candidates_per_question": 16,
+  "checkpoint_completed_blocks": [
+    2,
+    4,
+    6
+  ],
+  "settings_note": "Week 1 GSM8K-500 generation settings (Fast-dLLM, length 256, block 32, temperature 1.0). Only N and trajectory recording differ from Week 1; candidate i uses trajectory_seed(master_seed, question_id, i), so i < 8 shares Week 1 seeds."
+}
