@@ -27,18 +27,22 @@ def pool(qid, n=16, texts=None):
 
 
 class SubsetTests(unittest.TestCase):
-    def test_subsets_are_nested_ordered_and_deterministic(self):
+    def test_subsets_are_nested_pool_order_prefixes(self):
         ids = [f'q/c{i:02}' for i in range(16)]
-        subsets = nested_subsets('q', ids, 7)
-        self.assertEqual(subsets, nested_subsets('q', ids, 7))
-        self.assertEqual([len(subsets[n]) for n in (2, 4, 8, 16)], [2, 4, 8, 16])
+        subsets = nested_subsets(ids)
+        self.assertEqual(subsets[8], ids[:8])  # N <= 8 keeps Week 1's candidate seeds.
         for small, large in ((2, 4), (4, 8), (8, 16)):
-            self.assertTrue(set(subsets[small]) <= set(subsets[large]))
-        for members in subsets.values():
-            self.assertEqual(members, sorted(members))  # Original pool order, the shared tie-break order.
-        self.assertNotEqual(subsets[2], nested_subsets('q', ids, 8)[2])  # Membership depends on the seed.
+            self.assertEqual(subsets[large][:small], subsets[small])
         with self.assertRaises(ValueError):
-            nested_subsets('q', ids[:8], 7)
+            nested_subsets(ids[:8])
+
+    def test_labels_and_jev_requests_use_identical_subsets(self):
+        from jev_dllm.experiments import week2_jev
+        from jev_dllm.judges.listwise import nested_subsets as jev_subsets
+        pools = {'q': pool('q')}
+        order = week2_jev.candidate_orders(pools, week2_jev.SUBSET_SIZES)['q']  # Default used by prepare().
+        self.assertEqual(jev_subsets(order, week2_jev.SUBSET_SIZES),
+                         nested_subsets([c.candidate_id for c in pools['q']], week2_jev.SUBSET_SIZES))
 
 
 class StatisticsTests(unittest.TestCase):
@@ -51,14 +55,14 @@ class StatisticsTests(unittest.TestCase):
                   'generation_wall_seconds': 2.0} for p in pools.values() for c in p]
         traces = [{'candidate_id': c.candidate_id, 'confidence': {'mean_probability': 0.9 if correct.get(c.candidate_id) else 0.6}}
                   for p in pools.values() for c in p]
-        stats = week2_labels.statistics(questions, pools, correct, costs, traces, seed=3, run_note='shared GPU')
+        stats = week2_labels.statistics(questions, pools, correct, costs, traces, run_note='shared GPU')
         self.assertEqual((stats['question_count'], stats['excluded_questions'], stats['candidate_count']), (2, 1, 32))
         full = stats['by_subset_size']['16']
         self.assertAlmostEqual(full['mean_single_sample_accuracy'], (1 / 16 + 1) / 2)
         self.assertEqual(full['empirical_oracle_at_pool_size'], 1)
         self.assertAlmostEqual(full['mean_unique_text_fraction'], (1 + 1 / 16) / 2)
-        q0_two = nested_subsets('q0', [c.candidate_id for c in pools['q0']], 3)[2]
-        self.assertEqual(stats['by_subset_size']['2']['empirical_oracle_at_pool_size'], (('q0/c00' in q0_two) + 1) / 2)
+        self.assertEqual(stats['by_subset_size']['2']['empirical_oracle_at_pool_size'], 1)  # q0/c00 is in every prefix.
+        self.assertEqual(stats['by_subset_size']['2']['first_in_subset_accuracy'], 1)
         self.assertEqual(stats['generation_cost']['total_nfe'], 128)
         self.assertEqual(stats['generation_cost']['timing_note'], 'shared GPU')
         self.assertEqual(stats['commit_confidence_by_correctness']['correct'], {'count': 17, 'mean': 0.9})

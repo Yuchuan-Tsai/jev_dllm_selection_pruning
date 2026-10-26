@@ -22,7 +22,6 @@ from ..operations import remote
 from ..schema import Candidate
 from ..selection.subsets import SIZES, nested_subsets
 
-SUBSET_SEED = 20261008
 SCORERS = {"gsm8k": "gsm8k_units_v3", "math": "math500_math_verify_v1", "mbpp": "humaneval_single_block_v2"}
 
 
@@ -124,7 +123,7 @@ def mbpp_labels(root, questions, pools, refs, out):
                   "policy_version": policy["version"]}
 
 
-def statistics(questions, pools, correct, costs, traces, seed=SUBSET_SEED, run_note=None) -> dict:
+def statistics(questions, pools, correct, costs, traces, run_note=None) -> dict:
     """Aggregate pool quality per nested N; questions without labels are excluded and counted."""
     labeled = [q for q in questions if all(c.candidate_id in correct for c in pools[q.question_id])]
     sizes = tuple(n for n in SIZES if n <= min(len(pools[q.question_id]) for q in labeled))
@@ -133,7 +132,7 @@ def statistics(questions, pools, correct, costs, traces, seed=SUBSET_SEED, run_n
         texts, labels, first = {}, {}, []
         for q in labeled:
             pool = {c.candidate_id: c for c in pools[q.question_id]}
-            ids = nested_subsets(q.question_id, list(pool), seed, sizes)[n]
+            ids = nested_subsets(list(pool), sizes)[n]
             texts[q.question_id] = [pool[i].text for i in ids]
             labels[q.question_id] = [correct[i] for i in ids]
             first.append(correct[ids[0]])
@@ -160,7 +159,8 @@ def statistics(questions, pools, correct, costs, traces, seed=SUBSET_SEED, run_n
                                 "mean_wall_seconds": mean(cost[i]["generation_wall_seconds"] for i in scored),
                                 "timing_note": run_note or "No run note recorded; timing assumes an unshared GPU."},
             "commit_confidence_by_correctness": {"correct": conf(True), "incorrect": conf(False)},
-            "subset_seed": seed, "unit_of_analysis": "question",
+            "subset_rule": "first N candidates in pool order (same prefixes as week2_jev requests)",
+            "unit_of_analysis": "question",
             "note": "Development pool statistics. Oracle uses private labels and is not a selector. "
                     "Commit confidence is descriptive here; selector comparisons belong to Week 3."}
 
