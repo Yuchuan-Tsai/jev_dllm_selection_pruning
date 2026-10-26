@@ -8,6 +8,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from jev_dllm.data import week2_dev
+from jev_dllm.evaluation import week2_labels
 from jev_dllm.experiments import week2_pool
 from jev_dllm.operations import remote, week2 as operations
 
@@ -30,6 +31,9 @@ def main():
             cmd.add_argument("--hub-cache", required=True)
     for name in ("equivalence", "equivalence-child"):
         commands.add_parser(name).add_argument("--reference", type=Path, required=True)
+    cmd = commands.add_parser("labels")
+    cmd.add_argument("--run-dir", type=Path, required=True)
+    cmd.add_argument("--math-python", type=Path, help="Isolated Math-Verify interpreter; required for MATH pools")
     args = p.parse_args()
     root = args.root.resolve()
     resume = getattr(args, "resume_from", None)
@@ -59,6 +63,13 @@ def main():
             result = operations.start(root, args.task, resume)
         elif args.action == "pool-session-run":
             result = operations.session_run(root, args.task, args.gpu_id, args.hub_cache, resume)
+        elif args.action == "labels":
+            math_python = (root / args.math_python) if args.math_python else None
+            out = week2_labels.label(root, (root / args.run_dir).resolve(), math_python)
+            metrics = json.loads((out / "metrics.json").read_text())
+            result = {"status": "complete", "labels_directory": str(out),
+                      "accuracy_by_n": {n: s["mean_single_sample_accuracy"] for n, s in metrics["by_subset_size"].items()},
+                      "oracle_by_n": {n: s["empirical_oracle_at_pool_size"] for n, s in metrics["by_subset_size"].items()}}
         elif args.action == "equivalence":
             result = operations.child(root, "equivalence-child", "--reference", str((root / args.reference).resolve()))
         else:
