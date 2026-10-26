@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "scope": "week02_development_pools",
+  "seed": 20261008,
+  "count_per_task": 200,
+  "tasks": {
+    "gsm8k": {
+      "repository": "https://github.com/openai/grade-school-math",
+      "revision": "3101c7d5072418e28b9008a6636bde82a006892c",
+      "source": {
+        "path": "data/raw/gsm8k-train.jsonl",
+        "url": "https://raw.githubusercontent.com/openai/grade-school-math/3101c7d5072418e28b9008a6636bde82a006892c/grade_school_math/data/train.jsonl",
+        "sha256": "17f347dc51477c50d4efb83959dbb7c56297aba886e5544ee2aaed3024813465",
+        "bytes": 4166206,
+        "rows": 7473,
+        "format": "jsonl"
+      },
+      "selection_note": "Upstream train split only; the 20 Week 1 pilot development questions are excluded before sampling."
+    },
+    "math": {
+      "repository": "https://github.com/openai/prm800k",
+      "revision": "00811d6de065642a6967b9017d4cee59550c0ef4",
+      "source": {
+        "path": "data/raw/prm800k-math-train.jsonl",
+        "url": "https://media.githubusercontent.com/media/openai/prm800k/00811d6de065642a6967b9017d4cee59550c0ef4/prm800k/math_splits/train.jsonl",
+        "sha256": "90d96daeac3fe343ebb1e22ce93dd99690f75983e957f88de42f87cffe1e8076",
+        "bytes": 10896985,
+        "rows": 12000,
+        "format": "jsonl"
+      },
+      "unique_id_prefix": "train/",
+      "selection_note": "PRM800K math_splits/train.jsonl is stored in Git LFS; the pinned sha256 equals its LFS object ID. Only rows from the original MATH train split are eligible; MATH500 is the separate PRM800K test split."
+    },
+    "mbpp": {
+      "repository": "https://github.com/google-research/google-research",
+      "revision": "f82046ba5aabbbb427dbfd38a254d26bff08b533",
+      "source": {
+        "path": "data/raw/mbpp-sanitized.json",
+        "url": "https://raw.githubusercontent.com/google-research/google-research/f82046ba5aabbbb427dbfd38a254d26bff08b533/mbpp/sanitized-mbpp.json",
+        "sha256": "ca95deaa9a01ef0a6f439f88bcf0dd3db3563d22f22aad6cae04ebb9a8d8c8e9",
+        "bytes": 255053,
+        "rows": 427,
+        "format": "json"
+      },
+      "min_task_id": 11,
+      "selection_note": "Hand-verified sanitized subset. Task IDs 1-10 form the upstream few-shot prompt split and are excluded. Tasks are rewritten into a HumanEval-style signature plus docstring; tasks that cannot be converted unambiguously are dropped and recorded."
+    }
+  },
+  "protected_public_inputs": [
+    "data/processed/gsm8k-dev.json",
+    "data/processed/gsm8k-heldout.json",
+    "data/processed/math500-heldout.json",
+    "data/processed/humaneval-heldout.json",
+    "data/processed/processbench-gsm8k-diagnostic.json",
+    "data/processed/processbench-math-diagnostic.json"
+  ]
+}
