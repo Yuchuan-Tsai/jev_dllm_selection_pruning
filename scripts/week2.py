@@ -9,7 +9,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from jev_dllm.data import week2_dev
 from jev_dllm.evaluation import week2_labels
-from jev_dllm.experiments import week2_pool
+from jev_dllm.experiments import week2_jev, week2_pool
 from jev_dllm.operations import remote, week2 as operations
 
 
@@ -34,6 +34,14 @@ def main():
     cmd = commands.add_parser("labels")
     cmd.add_argument("--run-dir", type=Path, required=True)
     cmd.add_argument("--math-python", type=Path, help="Isolated Math-Verify interpreter; required for MATH pools")
+    cmd = commands.add_parser("jev-prepare")
+    cmd.add_argument("--run-dir", type=Path, required=True, help="Verified local copy of a complete pool run")
+    cmd.add_argument("--first", type=int, default=3, help="Use the first K development questions")
+    commands.add_parser("jev-check").add_argument("--plan-dir", type=Path, required=True)
+    cmd = commands.add_parser("jev-live")
+    cmd.add_argument("--plan-dir", type=Path, required=True)
+    cmd.add_argument("--approved-calls", type=int, required=True)
+    cmd.add_argument("--env-file", type=Path, default=Path(".env"))
     args = p.parse_args()
     root = args.root.resolve()
     resume = getattr(args, "resume_from", None)
@@ -70,6 +78,23 @@ def main():
             result = {"status": "complete", "labels_directory": str(out),
                       "accuracy_by_n": {n: s["mean_single_sample_accuracy"] for n, s in metrics["by_subset_size"].items()},
                       "oracle_by_n": {n: s["empirical_oracle_at_pool_size"] for n, s in metrics["by_subset_size"].items()}}
+        elif args.action == "jev-prepare":
+            run = (root / args.run_dir).resolve()
+            task, _, questions, _, _, _ = week2_labels.audit_pool(root, run)
+            if not 1 <= args.first <= len(questions):
+                raise ValueError("--first must select at least one development question")
+            plan_dir = week2_jev.prepare(root, task, run, root / f"data/processed/{task}-w2dev.json",
+                                         [q.question_id for q in questions[:args.first]])
+            plan = json.loads((plan_dir / "plan.json").read_text())
+            result = {"status": "prepared", "plan_directory": str(plan_dir), "planned_calls": plan["planned_calls"],
+                      "paid_calls_sent": 0}
+        elif args.action == "jev-check":
+            plan, rows = week2_jev.check(root, (root / args.plan_dir).resolve())
+            result = {"status": "passed", "task": plan["task"], "planned_calls": plan["planned_calls"],
+                      "requests": len(rows), "paid_calls_sent": 0}
+        elif args.action == "jev-live":
+            out = week2_jev.live(root, (root / args.plan_dir).resolve(), args.approved_calls, root / args.env_file)
+            result = {"status": "complete", "live_directory": str(out)}
         elif args.action == "equivalence":
             result = operations.child(root, "equivalence-child", "--reference", str((root / args.reference).resolve()))
         else:

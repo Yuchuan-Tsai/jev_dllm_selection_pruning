@@ -19,13 +19,20 @@ one another. No `make -f` option is needed.
 
 ## Version compatibility
 
-The consolidated commands use new `gsm8k500-freeze-v2.json` and
-`generation-lock-v2.json` implementation records for **new runs**. Sampling
-settings, source revisions, prompts, seeds and scoring rules are unchanged.
+New runs use the `gsm8k500-freeze-v4.json` and `generation-lock-v4.json`
+implementation records. v3 added an opt-in A800 substitute for the pinned A100
+(see below); v4 adds the Week 2 Make targets. Sampling settings, source
+revisions, prompts, seeds and scoring rules are unchanged since v2.
 The original records remain intact as historical metadata; old archives and Jev
 plans must be analyzed or resumed using the code revision recorded when they
 were created. Do not refresh their checksums to make them pass under this version.
-The previous public implementation is available at commit `872ecad`.
+Week 1 results were produced by the v2 implementation at commit `85341c4`;
+the previous public implementation is at commit `872ecad`.
+
+Held-out generation profiles pin `NVIDIA A100-SXM4-80GB`. On an A800 (SXM4-80GB
+or 80GB PCIe), export `JEV_HARDWARE_SUBSTITUTE` with the exact device name
+reported by `nvidia-smi --query-gpu=name --format=csv,noheader`; any other GPU
+is refused. Archives record the actual GPU, so the substitution stays visible.
 Use separate server directories for different versions, and upload the complete
 matching version with `make remote-upload` before using task-specific transfers.
 
@@ -270,6 +277,85 @@ reported as an uninterrupted no-retry run. Full-batch accuracy is unavailable
 until the continuation is complete.
 
 GSM8K has separate `gsm8k500-dry-run`, `gsm8k500-judge` and `gsm8k500-evaluate` targets. Use `RUN_DIR` for the verified archive and `SELECTIONS` for the saved Jev selections. Never reuse one task's scoring rule or judge prompt for another task.
+
+## Week 2 development pools and Jev interfaces
+
+Week 2 builds shared development pools for the Week 3 selector comparison.
+They never touch held-out data. `make week2-help` lists every command.
+
+**Development sets** (`make week2-data`, local): 200 questions per task, chosen
+by a seeded hash of source IDs from pinned sources (`configs/week02/dev-sources.json`):
+
+- GSM8K: the train split, excluding the 20 Week 1 pilot questions.
+- MATH: PRM800K `math_splits/train.jsonl` (MATH train rows only; pinned by its LFS sha256).
+- MBPP: the sanitized subset, rewritten into HumanEval-style prompts; tasks with an
+  ambiguous entry point are dropped and recorded.
+
+Preparation refuses any normalized prompt that overlaps GSM8K-500, MATH500,
+HumanEval, the pilot dev set or ProcessBench. Question IDs and source hashes
+are tracked in `data/manifests/week02-dev.json`; texts, answers and tests stay
+in ignored `data/`.
+
+**Pools** (`configs/week02/pool-*.json`): each task reuses its Week 1 generation
+profile, pinned by sha256, with N=16 instead of 8. Candidate `i` keeps the seed
+rule `trajectory_seed(master_seed, question_id, i)`, so candidates 0–7 share
+Week 1 seeds. `trajectories.jsonl` adds, per candidate:
+
+- the commit-time probability of every token, with a confidence summary;
+- drafts at 25/50/75% block progress (raw state with masks, plus an argmax-filled draft).
+
+Recording draws no random numbers. Two tests check this:
+`make test-week2-runtime` compares tokens, NFE and RNG state on a tiny CPU
+model, and `gpu-week2-equivalence` reproduces a Week 1 Fast-dLLM pilot run
+candidate for candidate on real hardware.
+
+```sh
+# Local
+make week2-data week2-check
+make remote-upload week2-upload
+# Server: optional equivalence check against your Week 1 fast-llada-dev run, then one pool per task
+make gpu-week2-equivalence GPU_ID=0 REFERENCE=artifacts/runs/<fast-llada-dev run>
+export JEV_SHARED_HUB_CACHE=<model cache> GPU_ID=0
+make start-week2-pool TASK=gsm8k   # likewise TASK=math and TASK=mbpp
+# After an interruption: resumes into a new directory and generates only missing candidates
+make start-week2-pool TASK=math RESUME_FROM=artifacts/runs/<interrupted w2pool-math run>
+```
+
+Pools sharing one GPU inflate wall and GPU seconds but not NFE. Set
+`JEV_RUN_NOTE` before starting so the manifest records the conditions.
+
+**Labels and statistics** (local, after `results-pull` and `results-verify`):
+`make week2-labels RUN_DIR=artifacts/downloads/lab/<w2pool run>`. Each task
+reuses its Week 1 scorer:
+
+- GSM8K: `gsm8k_units_v3`.
+- MATH: the frozen Math-Verify policy, run after its fixture and reference
+  controls (needs `make math500-scoring-setup`).
+- MBPP: HumanEval single-block extraction in offline Docker. Reference
+  solutions are run first, and tasks whose reference fails are excluded and recorded.
+
+Per-candidate labels stay in `evaluation_private/`. `metrics.json` reports
+mean single-sample accuracy, oracle@N, diversity and first-candidate accuracy
+for N=2/4/8/16, plus NFE, timing and commit confidence by correctness.
+Subset N is always the first N candidates in pool order. Jev requests use
+the same subsets, and a test pins this.
+
+**Jev interfaces** (paid; nothing is sent without an exact approval):
+
+- listwise: one Choice request per subset size;
+- pointwise: one request per candidate, with separate `correct` and
+  `consistent` noul targets;
+
+for 4 + 16 = 20 calls per question.
+
+```sh
+make week2-jev-prepare RUN_DIR=artifacts/downloads/lab/<w2pool run> JEV_FIRST=3
+make week2-jev-check PLAN_DIR=<printed plan directory>
+make week2-jev-live PLAN_DIR=<plan directory> APPROVED_CALLS=<planned total>
+```
+
+Requests contain public question text and candidate text only. A claim file
+blocks a second launch of the same batch; errors stop without retries.
 
 ## Repository and local files
 

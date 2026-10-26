@@ -58,6 +58,7 @@ help:
 	@echo 'Mac after transfer: judge-dry-run RUN_DIR=... | judge-live RUN_DIR=... | evaluate RUN_DIR=...'
 	@echo 'Mac SSH: remote-plan | remote-check | remote-upload | results-pull | results-watch'
 	@echo 'Mac terminal runs: results-verify RUN_ID=... | results-clean RUN_ID=... (deletes verified remote run)'
+	@echo 'Week 2 development pools and Jev interfaces: week2-help'
 	@echo 'Set SERVER_CONFIG to your ignored configs/server/local.json; see README.md.'
 
 setup:
@@ -499,3 +500,65 @@ math500-scoring-check:
 math500-evaluate:
 	@test -n "$(SCORING_PLAN)" || (echo 'Set SCORING_PLAN'; exit 2)
 	$(PYTHON) scripts/score_math500.py evaluate --math-python "$(MATH_PYTHON)" --plan "$(SCORING_PLAN)"
+
+# Week 2 development pools (N=16) and Jev pointwise/listwise interfaces
+TASK ?=
+REFERENCE ?=
+RESUME_FROM ?=
+JEV_FIRST ?= 3
+.PHONY: week2-help week2-data week2-check week2-upload test-week2-runtime gpu-week2-equivalence gpu-week2-pool start-week2-pool week2-labels week2-jev-prepare week2-jev-check week2-jev-live
+
+week2-help:
+	@echo 'Local: week2-data | week2-check | remote-upload then week2-upload'
+	@echo 'Server: gpu-week2-equivalence GPU_ID=... REFERENCE=artifacts/runs/<Week 1 fast-llada-dev run>'
+	@echo 'Server: start-week2-pool TASK=gsm8k|math|mbpp GPU_ID=... [RESUME_FROM=artifacts/runs/<failed run>]'
+	@echo 'Server, CPU only: test-week2-runtime (recording leaves sampling unchanged)'
+	@echo 'Local after results-pull/results-verify: week2-labels RUN_DIR=... (MATH needs math500-scoring-setup; MBPP needs Docker)'
+	@echo 'Local Jev: week2-jev-prepare RUN_DIR=... [JEV_FIRST=3] | week2-jev-check PLAN_DIR=... | week2-jev-live PLAN_DIR=... APPROVED_CALLS=...'
+	@echo 'See the Week 2 section of README.md.'
+
+week2-data:
+	$(PYTHON) scripts/week2.py data-fetch
+	$(PYTHON) scripts/week2.py data-prepare
+	$(PYTHON) scripts/week2.py data-check
+
+week2-check:
+	$(PYTHON) scripts/week2.py data-check
+	$(PYTHON) scripts/week2.py pool-check --task gsm8k
+	$(PYTHON) scripts/week2.py pool-check --task math
+	$(PYTHON) scripts/week2.py pool-check --task mbpp
+
+week2-upload:
+	$(PYTHON) scripts/week2.py upload --server-config "$(SERVER_CONFIG)"
+
+test-week2-runtime:
+	PYTHONDONTWRITEBYTECODE=1 CUDA_VISIBLE_DEVICES= $(RUNTIME_TEST_PYTHON) tests/integration/test_week2_instrumentation.py -v
+
+gpu-week2-equivalence:
+	@test -n "$(REFERENCE)" || (echo 'Set REFERENCE to a complete Week 1 fast-llada-dev run directory'; exit 2)
+	$(MAKE) gpu-lock-check
+	$(GPU_PYTHON) scripts/week2.py equivalence --reference "$(REFERENCE)"
+
+gpu-week2-pool:
+	@test -n "$(TASK)" || (echo 'Set TASK to gsm8k, math or mbpp'; exit 2)
+	$(GPU_PYTHON) scripts/week2.py pool-run --task "$(TASK)" $(if $(RESUME_FROM),--resume-from "$(RESUME_FROM)",)
+
+start-week2-pool:
+	@test -n "$(TASK)" || (echo 'Set TASK to gsm8k, math or mbpp'; exit 2)
+	$(GPU_PYTHON) scripts/week2.py pool-start --task "$(TASK)" $(if $(RESUME_FROM),--resume-from "$(RESUME_FROM)",)
+
+week2-labels:
+	@test -n "$(RUN_DIR)" || (echo 'Set RUN_DIR to a verified local Week 2 pool copy'; exit 2)
+	$(PYTHON) scripts/week2.py labels --run-dir "$(RUN_DIR)" --math-python "$(MATH_PYTHON)"
+
+week2-jev-prepare:
+	@test -n "$(RUN_DIR)" || (echo 'Set RUN_DIR to a verified local Week 2 pool copy'; exit 2)
+	$(PYTHON) scripts/week2.py jev-prepare --run-dir "$(RUN_DIR)" --first "$(JEV_FIRST)"
+
+week2-jev-check:
+	@test -n "$(PLAN_DIR)" || (echo 'Set PLAN_DIR to a prepared Week 2 Jev plan'; exit 2)
+	$(PYTHON) scripts/week2.py jev-check --plan-dir "$(PLAN_DIR)"
+
+week2-jev-live:
+	@test -n "$(PLAN_DIR)" -a -n "$(APPROVED_CALLS)" || (echo 'Set PLAN_DIR and the explicitly approved paid request count'; exit 2)
+	$(PYTHON) scripts/week2.py jev-live --plan-dir "$(PLAN_DIR)" --approved-calls "$(APPROVED_CALLS)" --env-file "$(ENV_FILE)"

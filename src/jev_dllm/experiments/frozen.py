@@ -7,7 +7,7 @@ from ..config import validate
 from ..reproducibility import fingerprint, trajectory_seed
 
 PROFILE = "configs/week01/gsm8k500.json"
-RECORD = "configs/week01/gsm8k500-freeze-v3.json"
+RECORD = "configs/week01/gsm8k500-freeze-v4.json"
 PHASE = "gsm8k500_heldout_selection"
 # Opt-in substitutes for the pinned GPU. The run must name the exact device in
 # JEV_HARDWARE_SUBSTITUTE; archives record the actual GPU name as the deviation.
