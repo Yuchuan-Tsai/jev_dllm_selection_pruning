@@ -8,6 +8,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+import unittest.mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'src'))
@@ -91,6 +92,12 @@ class Week2PoolTests(unittest.TestCase):
         self.assertEqual([t['candidate_id'] for t in self.rows(run, 'trajectories.jsonl')], [e[0] for e in expected])
         self.assertEqual(len(self.rows(run, 'costs.jsonl')), 12)
         self.assertEqual((run / 'pool-profile.json').read_bytes(), (self.root / week2_pool.profile_path('gsm8k')).read_bytes())
+        self.assertIsNone(manifest['run_note'])
+
+    def test_run_note_is_recorded(self):
+        with unittest.mock.patch.dict('os.environ', {'JEV_RUN_NOTE': 'three tasks share GPU 0'}):
+            run = self.run_pool(FakeBackend())
+        self.assertEqual(json.loads((run / 'manifest.json').read_text())['run_note'], 'three tasks share GPU 0')
 
     def test_interrupted_pool_resumes_to_the_same_records(self):
         reference = self.run_pool(FakeBackend())

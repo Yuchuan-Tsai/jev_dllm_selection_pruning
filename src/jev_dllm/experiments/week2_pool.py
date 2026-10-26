@@ -168,7 +168,9 @@ def start_run(root, prefix, record, hardware, backend_factory):
                 "truncated_candidates": 0, "empty_candidates": 0, "is_benchmark_result": False,
                 "started_at_utc": datetime.now(timezone.utc).isoformat(), "pid": os.getpid(),
                 "python": platform.python_version(), "platform": platform.platform(),
-                "hardware_at_start": hardware, "physical_gpu_id": os.environ.get("GPU_ID"), "api_calls": 0}
+                "hardware_at_start": hardware, "physical_gpu_id": os.environ.get("GPU_ID"), "api_calls": 0,
+                # Free-text run conditions, e.g. tasks sharing one GPU, which inflate wall and GPU seconds.
+                "run_note": os.environ.get("JEV_RUN_NOTE")}
     for name in ("artifacts/deployment.json", "artifacts/week2-deployment.json"):
         if (root / name).exists():
             manifest[Path(name).stem + "_sha256"] = sha256(root / name)

@@ -59,7 +59,9 @@ def start(root, task, resume_from=None):
     args = ["pool-session-run", "--task", task, "--gpu-id", env["CUDA_VISIBLE_DEVICES"], "--hub-cache", cache]
     if resume_from:
         args += ["--resume-from", str(resume_from)]
-    command = shlex.join([sys.executable, str(root / "scripts/week2.py"), "--root", str(root), *args])
+    # Pass the run note explicitly; an existing tmux server would not inherit this shell's environment.
+    note = ["env", "JEV_RUN_NOTE=" + os.environ["JEV_RUN_NOTE"]] if os.environ.get("JEV_RUN_NOTE") else []
+    command = shlex.join([*note, sys.executable, str(root / "scripts/week2.py"), "--root", str(root), *args])
     subprocess.run(["tmux", "new-session", "-d", "-s", session, "-c", str(root), command], check=True)
     return {"status": "session_created", "session": session, "view": "tmux attach -t " + session}
 
