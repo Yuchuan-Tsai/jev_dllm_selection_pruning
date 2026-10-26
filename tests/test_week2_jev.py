@@ -309,6 +309,36 @@ class Week2WorkflowTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 self.prepare(candidate_order=bad)
 
+    def test_plan_is_portable_to_a_copied_checkout(self):
+        plan_dir = self.prepare()
+        plan = json.loads((plan_dir / "plan.json").read_text())
+        self.assertEqual((plan["pool_dir"], plan["questions_path"]),
+                         ("artifacts/runs/week2-pool-gsm8k", "data/processed/gsm8k-w2dev.json"))
+        self.assertNotIn(str(self.root), (plan_dir / "plan.json").read_text())
+        with tempfile.TemporaryDirectory() as other:
+            copy = Path(other) / "checkout"
+            shutil.copytree(self.root, copy)
+            shutil.rmtree(self.root / "artifacts/runs/week2-pool-gsm8k")
+            _, rows = w.check(copy, copy / "artifacts/runs" / plan_dir.name)
+        self.assertEqual(rows, w.read_rows(plan_dir / "requests.jsonl"))
+
+    def test_rejects_inputs_outside_root_or_private(self):
+        with tempfile.TemporaryDirectory() as other:
+            outside = Path(other) / "pool"
+            shutil.copytree(self.pool, outside)
+            with self.assertRaises(ValueError):
+                w.prepare(self.root, "gsm8k", outside, self.questions, self.ids)
+        private = self.root / "data/private/gsm8k-w2dev.json"
+        shutil.copyfile(self.questions, private)
+        with self.assertRaises(ValueError):
+            w.prepare(self.root, "gsm8k", self.pool, private, self.ids)
+        plan_dir = self.prepare()
+        plan = json.loads((plan_dir / "plan.json").read_text())
+        for tampered in ("/abs/pool", "../pool", "data/private/x"):
+            (plan_dir / "plan.json").write_text(json.dumps({**plan, "pool_dir": tampered}))
+            with self.subTest(tampered=tampered), self.assertRaises(ValueError):
+                w.check(self.root, plan_dir)
+
     def test_rejects_heldout_and_unknown_questions(self):
         with self.assertRaises(ValueError):
             w.prepare(self.root, "gsm8k", self.pool, self.questions, ["g0", "missing"])

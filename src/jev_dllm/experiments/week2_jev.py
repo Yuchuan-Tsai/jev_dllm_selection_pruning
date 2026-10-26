@@ -79,6 +79,24 @@ def public_inputs(pool_dir: Path, questions_path: Path, question_ids: list[str])
     return selected, {q.question_id: pools[q.question_id] for q in selected}
 
 
+def project_path(root: Path, path: Path) -> str:
+    """Record inputs relative to the project root so a copied checkout re-verifies a plan."""
+    try:
+        relative = path.resolve().relative_to(root.resolve())
+    except ValueError:
+        raise ValueError("Week 2 Jev inputs must be inside the project root") from None
+    if "private" in relative.parts or not relative.parts:
+        raise ValueError("Week 2 Jev inputs must be public project files")
+    return relative.as_posix()
+
+
+def recorded_path(root: Path, name: str) -> Path:
+    relative = Path(name)
+    if relative.is_absolute() or ".." in relative.parts or "private" in relative.parts:
+        raise ValueError("Plan input paths must be public and project-relative")
+    return root / relative
+
+
 def file_order(question_id: str, candidate_ids: list[str]) -> list[str]:
     return list(candidate_ids)
 
@@ -125,6 +143,7 @@ def prepare(root: Path, task: str, pool_dir: Path, questions_path: Path, questio
             sizes: tuple[int, ...] = SUBSET_SIZES, candidate_order=None) -> Path:
     """Offline: freeze every request and the exact paid-call count. Sends nothing."""
     sizes = tuple(sizes)
+    pool_name, questions_name = project_path(root, pool_dir), project_path(root, questions_path)
     prompts = prompt_texts(root, task)
     questions, pools = public_inputs(pool_dir, questions_path, question_ids)
     orders = candidate_orders(pools, sizes, candidate_order)
@@ -135,9 +154,9 @@ def prepare(root: Path, task: str, pool_dir: Path, questions_path: Path, questio
             "subset_sizes": list(sizes), "question_ids": list(question_ids),
             "candidate_orders": orders,
             "candidate_order_source": getattr(candidate_order, "__qualname__", None) or "pool_file_order",
-            "pool_dir": str(pool_dir.resolve()),
+            "pool_dir": pool_name,
             "candidates_sha256": frozen.sha256(pool_dir / "candidates.jsonl"),
-            "questions_path": str(questions_path.resolve()), "questions_sha256": frozen.sha256(questions_path),
+            "questions_path": questions_name, "questions_sha256": frozen.sha256(questions_path),
             "prompts_sha256": {path: frozen.sha256(root / path) for path in prompt_paths(task).values()},
             "implementation_sha256": implementation(root), "host_python": platform.python_version(),
             "requests_sha256": frozen.sha256(out / "requests.jsonl"),
@@ -161,7 +180,7 @@ def check(root: Path, plan_dir: Path) -> tuple[dict, list[dict]]:
     task = p["task"]
     if p["prompts_sha256"] != {path: frozen.sha256(root / path) for path in prompt_paths(task).values()}:
         raise ValueError("Jev instructions changed since preparation")
-    pool_dir, questions_path = Path(p["pool_dir"]), Path(p["questions_path"])
+    pool_dir, questions_path = recorded_path(root, p["pool_dir"]), recorded_path(root, p["questions_path"])
     if (p["candidates_sha256"] != frozen.sha256(pool_dir / "candidates.jsonl")
             or p["questions_sha256"] != frozen.sha256(questions_path)):
         raise ValueError("Prepared public inputs changed")
