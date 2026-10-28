@@ -9,7 +9,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from jev_dllm.data import week2_dev
 from jev_dllm.evaluation import week2_labels
-from jev_dllm.experiments import week2_jev, week2_pool
+from jev_dllm.experiments import week2_jev, week2_jev_continuation, week2_pool
 from jev_dllm.operations import remote, week2 as operations
 
 
@@ -39,6 +39,11 @@ def main():
     cmd.add_argument("--run-dir", type=Path, required=True, help="Verified local copy of a complete pool run")
     cmd.add_argument("--first", type=int, default=3, help="Use the first K development questions")
     commands.add_parser("jev-check").add_argument("--plan-dir", type=Path, required=True)
+    commands.add_parser("jev-continue-check").add_argument("--plan-dir", type=Path, required=True)
+    cmd = commands.add_parser("jev-continue")
+    cmd.add_argument("--plan-dir", type=Path, required=True)
+    cmd.add_argument("--approved-calls", type=int, required=True)
+    cmd.add_argument("--env-file", type=Path, default=Path(".env"))
     cmd = commands.add_parser("jev-live")
     cmd.add_argument("--plan-dir", type=Path, required=True)
     cmd.add_argument("--approved-calls", type=int, required=True)
@@ -100,6 +105,14 @@ def main():
             plan, rows = week2_jev.check(root, (root / args.plan_dir).resolve())
             result = {"status": "passed", "task": plan["task"], "planned_calls": plan["planned_calls"],
                       "requests": len(rows), "paid_calls_sent": 0}
+        elif args.action == "jev-continue-check":
+            info = week2_jev_continuation.inspect(root, (root / args.plan_dir).resolve())
+            result = {"status": "passed", "task": info["plan"]["task"], "accepted_calls": info["accepted_calls"],
+                      "additional_calls": info["additional_calls"], "retried_call_index": info["retried_call_index"],
+                      "source_error": info["source_error"], "paid_calls_sent": 0}
+        elif args.action == "jev-continue":
+            out = week2_jev_continuation.live(root, (root / args.plan_dir).resolve(), args.approved_calls, root / args.env_file)
+            result = {"status": "complete", "continuation_directory": str(out)}
         elif args.action == "jev-live":
             out = week2_jev.live(root, (root / args.plan_dir).resolve(), args.approved_calls, root / args.env_file)
             result = {"status": "complete", "live_directory": str(out)}

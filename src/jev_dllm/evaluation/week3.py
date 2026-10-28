@@ -68,20 +68,26 @@ def open_scores(root: Path, run: Path, kind: str, task: str, pool_dir: Path) -> 
 
 def jev_scores(root: Path, plan_dir: Path, task: str, pool_dir: Path) -> dict:
     plan, _ = week2_jev.check(root, plan_dir)
-    live = json.loads((plan_dir / "live/manifest.json").read_text())
-    if (plan["task"] != task or live.get("status") != "complete"
-            or live.get("results_sha256") != sha256(plan_dir / "live/results.jsonl")
+    # A run that stopped and was finished by week2_jev_continuation lives in live-continued/.
+    output = next((plan_dir / name for name in ("live", "live-continued")
+                   if (plan_dir / name / "manifest.json").exists()
+                   and json.loads((plan_dir / name / "manifest.json").read_text()).get("status") == "complete"), None)
+    if output is None:
+        raise ValueError("Require a complete Jev live run (or a complete continuation of one)")
+    live = json.loads((output / "manifest.json").read_text())
+    if (plan["task"] != task or live.get("results_sha256") != sha256(output / "results.jsonl")
             or plan["candidates_sha256"] != sha256(pool_dir / "candidates.jsonl")):
         raise ValueError("Require a complete Jev live run planned on this exact pool")
     listwise, correct_p, consistent_p = {}, {}, {}
-    for r in rows(plan_dir / "live/results.jsonl"):
+    for r in rows(output / "results.jsonl"):
         if r["kind"] == "listwise":
             listwise[(r["question_id"], r["subset_size"])] = {"choice": r["candidate_id"], "probabilities": r["probabilities"]}
         else:
             correct_p[r["candidate_id"]] = r["correct_probability"]
             consistent_p[r["candidate_id"]] = r["consistent_probability"]
     return {"listwise": listwise, "correct": correct_p, "consistent": consistent_p,
-            "questions": set(plan["question_ids"]), "usage": live.get("usage"), "plan": plan_dir.name}
+            "questions": set(plan["question_ids"]), "usage": live.get("usage"), "plan": plan_dir.name,
+            "output": output.name, "continued_from": live.get("continued_from")}
 
 
 def answer_keys(root, task, questions, pools, math_python):
@@ -145,7 +151,7 @@ def analyze(root: Path, labels_dir: Path, math_python: Path | None = None, jev_p
         jev = jev_scores(root, jev_plan, task, pool_dir)
         if jev["questions"] >= {q.question_id for q in questions}:
             sources["jev"] = jev
-            provenance["jev_plan"] = jev["plan"]
+            provenance.update(jev_plan=jev["plan"], jev_output=jev["output"], jev_continued_from=jev["continued_from"])
         else:
             skipped.append(f"Jev covers {len(jev['questions'])} of {len(questions)} questions; Jev selectors need full coverage")
     else:
