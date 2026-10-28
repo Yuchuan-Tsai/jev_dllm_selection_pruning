@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "scope": "final_selector_decision_point_a",
+  "frozen_at_utc": "2026-10-28T19:52:35.513507+00:00",
+  "code_commit_before_freeze": "df021459b4f4209ff0a3fa8aee9d0398b5a9074e",
+  "decision": "Week 4 Decision Point A: Jev pointwise selection, choosing the highest `correct` probability, is the final selector for every held-out evaluation.",
+  "selector": {
+    "name": "jev_pointwise",
+    "interface": "pointwise",
+    "score": "correct",
+    "rule": "highest score; ties go to the earliest candidate in pool order; a missing score ranks last; with no scores, the first candidate",
+    "recorded_not_used": [
+      "consistent"
+    ]
+  },
+  "jev": {
+    "model": "jev-1.13.0",
+    "protocol": "week2_jev_v2",
+    "protocol_note": "The 0.01 rounding tolerance of week2_jev_v2 applies only to listwise choices and never changes a pointwise selection.",
+    "paid_calls": "only with an approved count equal to the planned count; stop at the first error; no automatic retries; claim files block a second launch"
+  },
+  "benchmarks": {
+    "gsm8k500": {
+      "development_task": "gsm8k",
+      "correct": "prompts/week02/jev_pointwise_correct_math.txt",
+      "consistent": "prompts/week02/jev_pointwise_consistent.txt"
+    },
+    "math500": {
+      "development_task": "math",
+      "correct": "prompts/week02/jev_pointwise_correct_math.txt",
+      "consistent": "prompts/week02/jev_pointwise_consistent.txt"
+    },
+    "humaneval": {
+      "development_task": "mbpp",
+      "correct": "prompts/week02/jev_pointwise_correct_code.txt",
+      "consistent": "prompts/week02/jev_pointwise_consistent.txt"
+    }
+  },
+  "files_sha256": {
+    "prompts/week02/jev_pointwise_consistent.txt": "7d797e27fe0eaf6934381936fbbf5659a68a750633d0a416ee91ee8f0bd208d7",
+    "prompts/week02/jev_pointwise_correct_code.txt": "f51f588abb42189ac47b6d18d4d41368d616a72f38c275a45edd3aa1dde70c01",
+    "prompts/week02/jev_pointwise_correct_math.txt": "36e3c4a98f5c56f3c8a08e7368abe2dfb4c8d07ec5d05a6c7df6890885331ff6",
+    "src/jev_dllm/experiments/selection.py": "fca65de572f1a6a3524af84de9e918b4827126c898117cf2e721101f47b0a5ec",
+    "src/jev_dllm/experiments/week2_jev.py": "aeb881aab4afe6eea8790207951161168cfc3060c4285b026ae7c6662ebfc19c",
+    "src/jev_dllm/judges/credentials.py": "28966ed6f434ee7db5b6e2561857157e92d1cfc2f99ea5096b1223ba526f186d",
+    "src/jev_dllm/judges/listwise.py": "6cbc580c137823f7b927644be15f3340aa090ee5816e74bc8e31f8b23d6a100e",
+    "src/jev_dllm/judges/payloads.py": "a92fe838170b3b35a3652bd4bcda7eff8c3bd4f543f7b9410c9a8d83a5722c35",
+    "src/jev_dllm/judges/pointwise.py": "7ae11aee50665dfb4f929abe436c9376e97a9bdf5e30197566e17ff0e90da6cd",
+    "src/jev_dllm/judges/typesafe.py": "d2be5b8bce2cf34d6b8b14b3b3a36fb3d5173d87cec83afcb2666b2a7b49e0b6",
+    "src/jev_dllm/reproducibility.py": "ad4d6213395836d7d5d27ec5e9b8197d89937127ad0ba52dde6dab8cf1eb52c7",
+    "src/jev_dllm/schema.py": "2d0a8620505aa5ca59f3c20942aca279c01d66bc4c6db79819db81e1cf5ca459",
+    "src/jev_dllm/selection/baselines.py": "707732de6d04153fedb8421b2c21db974d987ce7ff052d41d226fedc2ece78c9",
+    "src/jev_dllm/selection/frozen_selector.py": "4d293d8ff9c78721bc2a4fb0b839f7bc3818585aedca50949c45e04fb62ec514",
+    "src/jev_dllm/selection/week3.py": "35936fdd16ed845030729614f808e0ca44e6fc82d70a9f1154fc4f549318833e"
+  },
+  "held_out_used_for_choice": false,
+  "evidence": {
+    "subset_size": 16,
+    "basis": "most accurate selector at N=16 on all three development tasks (ties allowed); Week 2-3 report",
+    "analyses": {
+      "gsm8k": {
+        "run": "w3analysis-gsm8k-20261028T190643Z-80764040",
+        "metrics_sha256": "8e47aa92e72380853bf072f62e9d7051d109b4c3c3d1bf05f5d40226d4810da9",
+        "jev_plan": "week2-jev-gsm8k-plan-20261028T060226Z-b1967251",
+        "jev_output": "live",
+        "accuracy": 0.945
+      },
+      "math": {
+        "run": "w3analysis-math-20261028T190731Z-d5e27b45",
+        "metrics_sha256": "6bf6ae4c754b11d54d359d5ca55c8afe0b058b6b20adbfee8843bfa22713458e",
+        "jev_plan": "week2-jev-math-plan-20261028T060228Z-c3f2b349",
+        "jev_output": "live",
+        "accuracy": 0.61
+      },
+      "mbpp": {
+        "run": "w3analysis-mbpp-20261028T190740Z-fcc877ed",
+        "metrics_sha256": "ac49ddb398f8a04bcda30854537f40bbd89b62f21004ebfcd66d6bb088b7fd2f",
+        "jev_plan": "week2-jev-mbpp-plan-20261028T060233Z-a519b440",
+        "jev_output": "live-continued",
+        "accuracy": 0.695
+      }
+    }
+  }
+}

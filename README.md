@@ -19,9 +19,9 @@ one another. No `make -f` option is needed.
 
 ## Version compatibility
 
-New runs use the `gsm8k500-freeze-v5.json` and `generation-lock-v5.json`
+New runs use the `gsm8k500-freeze-v6.json` and `generation-lock-v6.json`
 implementation records. v3 added an opt-in A800 substitute for the pinned A100
-(see below); v4 and v5 add the Week 2 and Week 3 Make targets. Sampling settings, source
+(see below); v4, v5 and v6 add the Week 2, Week 3 and Week 4 Make targets. Sampling settings, source
 revisions, prompts, seeds and scoring rules are unchanged since v2.
 The original records remain intact as historical metadata; old archives and Jev
 plans must be analyzed or resumed using the code revision recorded when they
@@ -422,6 +422,40 @@ It also reports within-question AUROC on the full pool, calibration (Brier,
 ECE, reliability bins) for Jev pointwise `correct` and the Qwen judge's
 P(Yes), and the cost of each source. `summary.md` gives the same results as
 tables; per-question picks stay in `evaluation_private/`.
+
+## Week 4 frozen final selector (Decision Point A)
+
+The Week 3 development results chose **Jev pointwise** as the final selector:
+one Jev call per candidate, and the candidate with the highest `correct`
+probability is selected. Ties go to the earliest candidate in pool order, and
+a missing score ranks last. `consistent` is recorded but not used. The held-out
+sets played no part in this choice.
+
+`configs/week04/selector-freeze-v1.json` pins this decision:
+
+- the rule;
+- the Jev model (`jev-1.13.0`) and response protocol (`week2_jev_v2`, whose
+  0.01 rounding tolerance affects listwise choices only);
+- the prompt used for each held-out benchmark (GSM8K-500 and MATH500 use
+  `jev_pointwise_correct_math.txt`, HumanEval `jev_pointwise_correct_code.txt`);
+- the SHA-256 of every prompt and implementation file;
+- the three Week 3 analyses it was chosen on, with each `metrics.json` hash and
+  Jev pointwise's N=16 accuracy.
+
+```sh
+make week4-selector-check   # offline; no labels, no API calls
+```
+
+The check refuses any changed prompt or code file, and any record that
+disagrees with the code's model, protocol or prompt map. Where the cited
+`w3analysis-*` runs exist locally, it also confirms their hashes and that Jev
+pointwise is still the most accurate selector at N=16 (ties allowed). Without
+those runs, it reports the evidence as "not available locally".
+
+`frozen_selector.check` must pass before any held-out selection. To change the
+selector, write a new versioned record rather than editing this one. The
+Makefile change that added these targets is covered by the v6 freeze and
+collection-lock records; v5 stays intact for historical archives.
 
 ## Repository and local files
 

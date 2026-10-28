@@ -23,7 +23,7 @@ from ..schema import Candidate, CostRecord, Question
 
 TASKS = {"math500": 500, "humaneval": 164}
 SCOPE = "early_heldout_answer_collection_v1"
-LOCK = "configs/collection/generation-lock-v5.json"
+LOCK = "configs/collection/generation-lock-v6.json"
 EXTENSION = (
     "Makefile", "scripts/collect_benchmarks.py",
     "src/jev_dllm/experiments/collection.py", "src/jev_dllm/operations/collection.py",

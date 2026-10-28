@@ -60,6 +60,7 @@ help:
 	@echo 'Mac terminal runs: results-verify RUN_ID=... | results-clean RUN_ID=... (deletes verified remote run)'
 	@echo 'Week 2 development pools and Jev interfaces: week2-help'
 	@echo 'Week 3 selector comparison: week3-help'
+	@echo 'Week 4 frozen final selector: week4-help'
 	@echo 'Set SERVER_CONFIG to your ignored configs/server/local.json; see README.md.'
 
 setup:
@@ -612,3 +613,12 @@ gpu-week3-judges-all:
 week3-analyze:
 	@test -n "$(TASK)" || (echo 'Set TASK to gsm8k, math or mbpp'; exit 2)
 	$(PYTHON) scripts/week3.py analyze --task "$(TASK)" --math-python "$(MATH_PYTHON)" $(if $(W3_JEV_PLAN),--jev-plan "$(W3_JEV_PLAN)",)
+
+.PHONY: week4-help week4-selector-check
+
+week4-help:
+	@echo 'Local (offline): week4-selector-check (frozen Jev pointwise selector, Decision Point A)'
+	@echo 'See the Week 4 section of README.md.'
+
+week4-selector-check:
+	$(PYTHON) scripts/week4.py selector-check
