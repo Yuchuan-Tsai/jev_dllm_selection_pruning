@@ -1,0 +1,8 @@
+# Separate Week 3 judge environment (Linux x86_64, Python 3.11). The Week 1/2 generation lock stays untouched.
+# Install: make judges-setup (torch from the CUDA 12.1 index, the rest pinned here).
+transformers==4.46.3
+tokenizers==0.20.3
+huggingface_hub==0.26.5
+safetensors==0.4.5
+numpy==1.26.4
+jinja2==3.1.4

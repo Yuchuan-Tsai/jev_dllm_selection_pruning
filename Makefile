@@ -59,6 +59,7 @@ help:
 	@echo 'Mac SSH: remote-plan | remote-check | remote-upload | results-pull | results-watch'
 	@echo 'Mac terminal runs: results-verify RUN_ID=... | results-clean RUN_ID=... (deletes verified remote run)'
 	@echo 'Week 2 development pools and Jev interfaces: week2-help'
+	@echo 'Week 3 selector comparison: week3-help'
 	@echo 'Set SERVER_CONFIG to your ignored configs/server/local.json; see README.md.'
 
 setup:
@@ -562,3 +563,52 @@ week2-jev-check:
 week2-jev-live:
 	@test -n "$(PLAN_DIR)" -a -n "$(APPROVED_CALLS)" || (echo 'Set PLAN_DIR and the explicitly approved paid request count'; exit 2)
 	$(PYTHON) scripts/week2.py jev-live --plan-dir "$(PLAN_DIR)" --approved-calls "$(APPROVED_CALLS)" --env-file "$(ENV_FILE)"
+
+# Week 3 selector comparison on the Week 2 development pools
+JUDGE_PYTHON ?= .venv-judges/bin/python
+KIND ?=
+LIMIT ?=
+POOL_DIR ?=
+W3_JEV_PLAN ?=
+.PHONY: week3-help judges-setup judges-check judges-fetch gpu-week3-judge gpu-week3-judges-all week3-analyze
+
+week3-help:
+	@echo 'Server (separate env): judges-setup | judges-check | judges-fetch KIND=judge|prm (needs JEV_SHARED_HUB_CACHE)'
+	@echo 'Server: gpu-week3-judge KIND=judge|prm TASK=gsm8k|math|mbpp GPU_ID=... [POOL_DIR=...] [LIMIT=2 smoke test]'
+	@echo 'Server: gpu-week3-judges-all GPU_ID=... (Qwen judge on 3 tasks, PRM on GSM8K and MATH)'
+	@echo 'Local: results-pull; results-verify RUN_ID=<each w3judge/w3prm run>'
+	@echo 'Local Jev (paid): week2-jev-prepare RUN_DIR=<pool copy> JEV_FIRST=200 | week2-jev-check | week2-jev-live'
+	@echo 'Local: week3-analyze TASK=... [W3_JEV_PLAN=<completed Jev plan>] (MATH needs .venv-math)'
+	@echo 'See the Week 3 section of README.md.'
+
+judges-setup:
+	@umask 077; $(SERVER_PYTHON) -m venv .venv-judges
+	@umask 077; mkdir -p .cache/pip-tmp
+	TMPDIR="$(CURDIR)/.cache/pip-tmp" $(JUDGE_PYTHON) -m pip install --no-cache-dir --only-binary=:all: 'torch==2.5.1+cu121' --index-url https://download.pytorch.org/whl/cu121 --extra-index-url https://pypi.org/simple
+	TMPDIR="$(CURDIR)/.cache/pip-tmp" $(JUDGE_PYTHON) -m pip install --no-cache-dir --only-binary=:all: -r requirements/week3-judges.in
+	$(MAKE) judges-check
+
+judges-check:
+	$(JUDGE_PYTHON) scripts/week3.py judges-check
+	$(JUDGE_PYTHON) -m pip check
+
+judges-fetch:
+	@test -n "$(KIND)" || (echo 'Set KIND to judge or prm'; exit 2)
+	$(JUDGE_PYTHON) scripts/week3.py judges-fetch --kind "$(KIND)"
+
+gpu-week3-judge:
+	@test -n "$(KIND)" -a -n "$(TASK)" || (echo 'Set KIND (judge|prm) and TASK (gsm8k|math|mbpp)'; exit 2)
+	$(MAKE) judges-check
+	$(JUDGE_PYTHON) scripts/week3.py judge-run --kind "$(KIND)" --task "$(TASK)" $(if $(POOL_DIR),--pool-dir "$(POOL_DIR)",) $(if $(LIMIT),--limit "$(LIMIT)",)
+
+gpu-week3-judges-all:
+	$(MAKE) judges-check
+	$(JUDGE_PYTHON) scripts/week3.py judge-run --kind judge --task gsm8k
+	$(JUDGE_PYTHON) scripts/week3.py judge-run --kind judge --task math
+	$(JUDGE_PYTHON) scripts/week3.py judge-run --kind judge --task mbpp
+	$(JUDGE_PYTHON) scripts/week3.py judge-run --kind prm --task gsm8k
+	$(JUDGE_PYTHON) scripts/week3.py judge-run --kind prm --task math
+
+week3-analyze:
+	@test -n "$(TASK)" || (echo 'Set TASK to gsm8k, math or mbpp'; exit 2)
+	$(PYTHON) scripts/week3.py analyze --task "$(TASK)" --math-python "$(MATH_PYTHON)" $(if $(W3_JEV_PLAN),--jev-plan "$(W3_JEV_PLAN)",)

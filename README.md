@@ -19,9 +19,9 @@ one another. No `make -f` option is needed.
 
 ## Version compatibility
 
-New runs use the `gsm8k500-freeze-v4.json` and `generation-lock-v4.json`
+New runs use the `gsm8k500-freeze-v5.json` and `generation-lock-v5.json`
 implementation records. v3 added an opt-in A800 substitute for the pinned A100
-(see below); v4 adds the Week 2 Make targets. Sampling settings, source
+(see below); v4 and v5 add the Week 2 and Week 3 Make targets. Sampling settings, source
 revisions, prompts, seeds and scoring rules are unchanged since v2.
 The original records remain intact as historical metadata; old archives and Jev
 plans must be analyzed or resumed using the code revision recorded when they
@@ -360,6 +360,54 @@ make week2-jev-live PLAN_DIR=<plan directory> APPROVED_CALLS=<planned total>
 
 Requests contain public question text and candidate text only. A claim file
 blocks a second launch of the same batch; errors stop without retries.
+
+## Week 3 selector comparison
+
+Week 3 compares selectors on the Week 2 development pools at N=2/4/8/16.
+Everything is graded against the private Week 2 labels. `make week3-help`
+lists every command.
+
+| Selector | Source | Runs where |
+| --- | --- | --- |
+| first, seeded random, majority (GSM8K, MATH) | candidate text; MATH groups from Math-Verify | local |
+| dLLM confidence (mean / min / mean-log commit probability) | Week 2 trajectory records | local |
+| Jev listwise, Jev pointwise, Jev-weighted voting | a completed Week 2 Jev plan on the full pool | local; paid API |
+| Qwen2.5-7B-Instruct judge (P(Yes) to "is this correct?") | `w3judge-*` runs | server GPU |
+| Qwen2.5-Math-PRM-7B (minimum step score) | `w3prm-*` runs on GSM8K and MATH | server GPU |
+
+All ties go to pool order. The judge models are pinned by Hugging Face revision
+in `configs/week03/open-judges.json`, and their prompts by SHA-256. The PRM
+aggregation (minimum step score) was frozen before any scores were seen. The
+judges run in a separate `.venv-judges` environment pinned by
+`requirements/week3-judges.in`, so the locked generation environment stays untouched.
+
+```sh
+# Server (no generation environment changes)
+make judges-setup                        # separate env; then judges-check
+export JEV_SHARED_HUB_CACHE=<model cache> GPU_ID=0
+make judges-fetch KIND=judge && make judges-fetch KIND=prm
+make gpu-week3-judge KIND=judge TASK=gsm8k LIMIT=2   # smoke test
+make gpu-week3-judges-all                # ~3-4 GPU hours on an A800
+# Local
+make results-pull                        # then results-verify RUN_ID=<each w3judge/w3prm run>
+make week2-jev-prepare RUN_DIR=artifacts/downloads/lab/<w2pool run> JEV_FIRST=200   # full Jev plan (paid when live)
+make week3-analyze TASK=gsm8k [W3_JEV_PLAN=<completed plan>]   # likewise math, mbpp
+```
+
+`week3-analyze` accepts only verified local copies of full-pool judge runs
+scored against this exact pool and profile, and a Jev run that covers every
+question. Selectors without their source are skipped and listed.
+
+`metrics.json` reports, per N:
+
+- selected-answer accuracy, with paired bootstrap 95% intervals against random and majority;
+- gap closed;
+- pool versus selector failures.
+
+It also reports within-question AUROC on the full pool, calibration (Brier,
+ECE, reliability bins) for Jev pointwise `correct` and the Qwen judge's
+P(Yes), and the cost of each source. `summary.md` gives the same results as
+tables; per-question picks stay in `evaluation_private/`.
 
 ## Repository and local files
 

@@ -68,7 +68,7 @@ class MakefileTests(unittest.TestCase):
         for name, key in ((frozen.RECORD, 'public_files_sha256'), (collection.LOCK, 'files_sha256')):
             with self.subTest(record=name):
                 record = json.loads((ROOT / name).read_text())
-                self.assertEqual(record['implementation_revision'], 4)
+                self.assertEqual(record['implementation_revision'], 5)
                 prior = record['supersedes']
                 self.assertNotEqual(name, prior['record'])
                 self.assertEqual(frozen.sha256(ROOT / prior['record']), prior['sha256'])

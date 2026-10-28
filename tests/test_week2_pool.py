@@ -29,7 +29,7 @@ class FakeBackend:
             self.calls.append(candidate_id)
         text = f'answer {seed % 997}' + (' changed' if candidate_id == self.tweak else '')
         self.last_trace = {'question_id': question.question_id, 'candidate_id': candidate_id, 'seed': seed,
-                           'commit_probability': [0.5], 'confidence': {'mean_probability': 0.5}, 'checkpoints': []}
+                           'commit_probability': [0.5], 'confidence': {'mean_probability': 0.5, 'min_probability': 0.5, 'mean_log_probability': -0.69}, 'checkpoints': []}
         return (Candidate(question.question_id, candidate_id, seed, text, True, False, 0.5),
                 CostRecord(trajectory_nfe=3, generation_gpu_seconds=.1, generation_wall_seconds=.1, peak_memory_bytes=1))
 

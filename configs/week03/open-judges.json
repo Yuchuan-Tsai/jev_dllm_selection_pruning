@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "scope": "week03_open_model_judges",
+  "requirements": {
+    "path": "requirements/week3-judges.in",
+    "sha256": "878d602203ce05d8a50cb8de57fee48559e32a7ffa889f211b2eb81257685cd7",
+    "torch": "2.5.1+cu121"
+  },
+  "judge": {
+    "model_id": "Qwen/Qwen2.5-7B-Instruct",
+    "revision": "a09a35458c702b33eeacc393d103063234e8bc28",
+    "dtype": "bfloat16",
+    "tasks": [
+      "gsm8k",
+      "math",
+      "mbpp"
+    ],
+    "prompts": {
+      "gsm8k": {
+        "path": "prompts/week03/qwen_judge_math.txt",
+        "sha256": "474c82aaa6d8f93b4af658041316d54983133095fed331b5ba386ae56d244ecc"
+      },
+      "math": {
+        "path": "prompts/week03/qwen_judge_math.txt",
+        "sha256": "474c82aaa6d8f93b4af658041316d54983133095fed331b5ba386ae56d244ecc"
+      },
+      "mbpp": {
+        "path": "prompts/week03/qwen_judge_code.txt",
+        "sha256": "4d91424c20af2d8e4032981c43441f98947170a4538a726193548abc47f940e7"
+      }
+    },
+    "yes_token": "Yes",
+    "no_token": "No",
+    "max_input_tokens": 4096,
+    "score": "softmax over the next-token logits of the Yes and No tokens after the assistant turn starts; no sampling"
+  },
+  "prm": {
+    "model_id": "Qwen/Qwen2.5-Math-PRM-7B",
+    "revision": "0610740060112df12585d00a1c5f4624d2f59051",
+    "dtype": "bfloat16",
+    "tasks": [
+      "gsm8k",
+      "math"
+    ],
+    "max_input_tokens": 4096,
+    "system": "Please reason step by step, and put your final answer within \boxed{}.",
+    "step_separator": "<extra_0>",
+    "step_split": "blank_lines",
+    "aggregation": "min",
+    "score": "positive-class softmax probability at each step separator, as in the model card; solution score = minimum over steps, frozen before any results"
+  }
+}
