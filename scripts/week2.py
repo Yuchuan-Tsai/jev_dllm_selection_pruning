@@ -34,6 +34,7 @@ def main():
     cmd = commands.add_parser("labels")
     cmd.add_argument("--run-dir", type=Path, required=True)
     cmd.add_argument("--math-python", type=Path, help="Isolated Math-Verify interpreter; required for MATH pools")
+    commands.add_parser("summary").add_argument("--label-dirs", type=Path, nargs="+", required=True)
     cmd = commands.add_parser("jev-prepare")
     cmd.add_argument("--run-dir", type=Path, required=True, help="Verified local copy of a complete pool run")
     cmd.add_argument("--first", type=int, default=3, help="Use the first K development questions")
@@ -78,6 +79,13 @@ def main():
             result = {"status": "complete", "labels_directory": str(out),
                       "accuracy_by_n": {n: s["mean_single_sample_accuracy"] for n, s in metrics["by_subset_size"].items()},
                       "oracle_by_n": {n: s["empirical_oracle_at_pool_size"] for n, s in metrics["by_subset_size"].items()}}
+        elif args.action == "summary":
+            record, table = week2_labels.summary([(root / d).resolve() for d in args.label_dirs])
+            out = week2_pool.new_run(root / "artifacts/runs", "w2summary")
+            (out / "summary.md").write_text(table)
+            week2_pool.write_json(out / "summary.json", record)
+            print(table)
+            result = {"status": "complete", "summary_directory": str(out)}
         elif args.action == "jev-prepare":
             run = (root / args.run_dir).resolve()
             task, _, questions, _, _, _ = week2_labels.audit_pool(root, run)

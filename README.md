@@ -337,6 +337,10 @@ reuses its Week 1 scorer:
 Per-candidate labels stay in `evaluation_private/`. `metrics.json` reports
 mean single-sample accuracy, oracle@N, diversity and first-candidate accuracy
 for N=2/4/8/16, plus NFE, timing and commit confidence by correctness.
+Combine the three completed label runs into the Week 2 pool-quality table with
+`python3 scripts/week2.py summary --label-dirs artifacts/runs/<w2labels-gsm8k> artifacts/runs/<w2labels-math> artifacts/runs/<w2labels-mbpp>`.
+This writes `summary.md` and `summary.json` to a new `w2summary-*` directory
+and refuses label runs whose metrics changed after labeling.
 Subset N is always the first N candidates in pool order. Jev requests use
 the same subsets, and a test pins this.
 

@@ -165,6 +165,41 @@ def statistics(questions, pools, correct, costs, traces, run_note=None) -> dict:
                     "Commit confidence is descriptive here; selector comparisons belong to Week 3."}
 
 
+def summary(label_dirs: list[Path]) -> tuple[dict, str]:
+    """Combine completed label runs (one per task) into a JSON summary and a Markdown table."""
+    tasks = {}
+    for directory in label_dirs:
+        manifest = json.loads((directory / "manifest.json").read_text())
+        metrics = json.loads((directory / "metrics.json").read_text())
+        if manifest.get("status") != "complete" or sha256(directory / "metrics.json") != manifest.get("metrics_sha256"):
+            raise ValueError(f"{directory.name} is not a complete, unchanged label run")
+        if metrics["task"] in tasks:
+            raise ValueError(f"Two label runs for {metrics['task']}")
+        tasks[metrics["task"]] = {"label_run": directory.name, "pool_run": manifest["pool_run"],
+                                  "metrics_sha256": manifest["metrics_sha256"], "metrics": metrics}
+    lines = ["| Task | Questions | N | Mean single-sample accuracy | Oracle@N | Unique text | First candidate |",
+             "|---|---|---|---|---|---|---|"]
+    for task in ("gsm8k", "math", "mbpp"):
+        if task not in tasks:
+            continue
+        m = tasks[task]["metrics"]
+        for n, s in m["by_subset_size"].items():
+            lines.append(f"| {task} | {m['question_count']} | {n} | {s['mean_single_sample_accuracy']:.1%} | "
+                         f"{s['empirical_oracle_at_pool_size']:.1%} | {s['mean_unique_text_fraction']:.1%} | "
+                         f"{s['first_in_subset_accuracy']:.1%} |")
+    lines += ["", "| Task | Mean NFE | Truncated | Commit confidence (correct / incorrect) | Excluded questions |",
+              "|---|---|---|---|---|"]
+    for task in ("gsm8k", "math", "mbpp"):
+        if task not in tasks:
+            continue
+        m = tasks[task]["metrics"]
+        c = m["commit_confidence_by_correctness"]
+        fmt = lambda v: "n/a" if v is None else f"{v:.3f}"
+        lines.append(f"| {task} | {m['generation_cost']['mean_nfe']:.1f} | {m['generation_flags']['truncated_fraction']:.1%} | "
+                     f"{fmt(c['correct']['mean'])} / {fmt(c['incorrect']['mean'])} | {m['excluded_questions']} |")
+    return {task: {k: v for k, v in info.items() if k != "metrics"} for task, info in tasks.items()}, "\n".join(lines) + "\n"
+
+
 def label(root: Path, run: Path, math_python: Path | None = None) -> Path:
     task, pool_manifest, questions, pools, costs, traces = audit_pool(root, run)
     refs = references(root, task, questions)

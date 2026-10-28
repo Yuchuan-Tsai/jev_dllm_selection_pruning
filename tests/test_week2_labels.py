@@ -108,6 +108,19 @@ class LabelPipelineTests(unittest.TestCase):
         self.assertEqual(metrics['by_subset_size']['4']['empirical_oracle_at_pool_size'], 1)
         self.assertNotIn('correct_by_candidate', json.dumps(metrics))  # Per-candidate labels stay private.
 
+    def test_summary_combines_label_runs_and_refuses_changed_metrics(self):
+        local = self.verified_copy(self.run_pool(FakeBackend()))
+        with redirect_stdout(io.StringIO()):
+            out = week2_labels.label(self.root, local)
+        record, table = week2_labels.summary([out])
+        self.assertEqual(record['gsm8k']['pool_run'], local.name)
+        self.assertIn('| gsm8k | 3 | 4 |', table)
+        with self.assertRaisesRegex(ValueError, 'Two label runs'):
+            week2_labels.summary([out, out])
+        (out / 'metrics.json').write_text((out / 'metrics.json').read_text().replace('gsm8k', 'math', 1))
+        with self.assertRaisesRegex(ValueError, 'not a complete, unchanged'):
+            week2_labels.summary([out])
+
     def test_unverified_or_tampered_copy_is_refused(self):
         local = self.verified_copy(self.run_pool(FakeBackend()))
         (local / 'candidates.jsonl').write_text((local / 'candidates.jsonl').read_text().replace('answer', 'Answer', 1))
