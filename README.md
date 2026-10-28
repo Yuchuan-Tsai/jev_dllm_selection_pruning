@@ -394,6 +394,20 @@ make week2-jev-prepare RUN_DIR=artifacts/downloads/lab/<w2pool run> JEV_FIRST=20
 make week3-analyze TASK=gsm8k [W3_JEV_PLAN=<completed plan>]   # likewise math, mbpp
 ```
 
+If the PyTorch index is slow, the judge environment can start as a copy of the
+locked generation environment, which already holds the same `torch==2.5.1+cu121`;
+`judges-check` then verifies every pinned version, whichever way they were installed:
+
+```sh
+cp -a .venv-gpu .venv-judges
+.venv-judges/bin/python -m pip install --no-cache-dir -r requirements/week3-judges.in
+make judges-check
+```
+
+Disk: the two judge models need about 30 GB beside the 16 GB generator. A 50 GB
+data disk is too small, so expand it or temporarily move the LLaDA cache
+directory off the data disk (move it back before generating).
+
 `week3-analyze` accepts only verified local copies of full-pool judge runs
 scored against this exact pool and profile, and a Jev run that covers every
 question. Selectors without their source are skipped and listed.
