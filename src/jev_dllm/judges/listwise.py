@@ -1,14 +1,56 @@
 """Listwise Jev Choice over nested candidate subsets, keeping raw candidate text.
 
-Wraps typesafe.build_request and typesafe.parse_response unchanged.
+Wraps typesafe.build_request and typesafe.parse_response unchanged; the only
+relaxation is one flagged two-decimal rounding step for the chosen option.
 """
 from dataclasses import replace
+import math
 import random
 from ..reproducibility import trajectory_seed
 from ..schema import Candidate, Question
+from .pointwise import post
 from .typesafe import build_request, parse_response
 
-parse_listwise_response = parse_response
+ROUNDING_STEP = 0.01
+INCONSISTENT = "Jev choice is inconsistent with its probabilities"
+
+
+def parse_listwise_response(response: dict, request: dict) -> dict:
+    """typesafe.parse_response, except that a choice at most one rounding step below the top
+    probability is accepted when all probabilities have two decimals; it is flagged rounding_tie.
+
+    Live responses report probabilities rounded to 0.01, so near-ties can show the chosen option
+    0.01 below another. Every other check, and any larger gap, still rejects the response.
+    """
+    try:
+        return {**parse_response(response, request), "rounding_tie": False}
+    except ValueError as exc:
+        if str(exc) != INCONSISTENT:
+            raise
+    # parse_response checked the model, choice, option set, values and sum before this check.
+    answer = response["answers"]["best_answer"]
+    probabilities = answer["probabilities"]
+    two_decimal = all(math.isclose(p * 100, round(p * 100), abs_tol=1e-8) for p in probabilities.values())
+    if not two_decimal or probabilities[answer["choice"]] < max(probabilities.values()) - ROUNDING_STEP - 1e-8:
+        raise ValueError(INCONSISTENT + " beyond one two-decimal rounding step")
+    confidence = answer["confidence"]
+    if type(confidence) not in (int, float) or not math.isfinite(confidence) or not 0 <= confidence <= 1:
+        raise ValueError("Invalid Jev confidence")
+    usage = response["usage"]
+    if any(type(usage.get(k)) is not int or usage[k] < 0 for k in ("input_tokens", "output_tokens")):
+        raise ValueError("Invalid Jev token usage")
+    total = sum(probabilities.values())
+    return {"candidate_id": answer["choice"], "probabilities": probabilities, "confidence": confidence,
+            "model": response["model"], "usage": usage, "probability_sum": total,
+            "probability_sum_tolerance": max(1e-4, len(probabilities) * 0.005 + 1e-8), "rounding_tie": True}
+
+
+class ListwiseJudge:
+    def __init__(self, timeout: float = 60):
+        self.timeout = timeout
+
+    def select(self, request: dict) -> dict:
+        return post(request, parse_listwise_response, self.timeout)
 
 
 def presentation_order(candidate_ids: list[str], seed: int, question_id: str) -> list[str]:

@@ -15,10 +15,12 @@ from .selection import load_pools, new_run, write_json
 from ..judges.credentials import load_api_key
 from ..judges.listwise import build_listwise_request, nested_subsets, parse_listwise_response
 from ..judges.pointwise import PointwiseJudge, build_pointwise_request, parse_pointwise_response
-from ..judges.typesafe import TypeSafeJudge
+from ..judges.listwise import ROUNDING_STEP, ListwiseJudge
 from ..reproducibility import fingerprint
 
-VERSION = "week2_jev_v1"
+# v2 accepts a listwise choice one two-decimal rounding step below the top probability, flagged
+# rounding_tie; v1 rejected it. A new version also means new claims, so v1 batches stay as evidence.
+VERSION = "week2_jev_v2"
 MODEL = "jev-1.13.0"
 SEED = 20261008
 SUBSET_SIZES = (2, 4, 8, 16)
@@ -163,6 +165,8 @@ def prepare(root: Path, task: str, pool_dir: Path, questions_path: Path, questio
             "planned_calls": call_counts(rows),
             "calls_per_question": {"listwise": len(sizes), "pointwise": sizes[-1]},
             "automatic_retries": 0, "paid_calls_sent": 0, "correctness_scored": False,
+            "listwise_choice_tolerance": {"rounding_step": ROUNDING_STEP, "requires_two_decimal_probabilities": True,
+                                          "flag": "rounding_tie"},
             "candidate_policy": "Original IDs and raw text retained unchanged, including truncated or incomplete answers; no labels or references."}
     write_json(out / "plan.json", plan)
     return out
@@ -219,6 +223,7 @@ def usage_summary(records: list[dict]) -> dict:
                          "request_seconds_sum": sum(seconds),
                          "request_seconds_mean": sum(seconds) / len(seconds) if seconds else None,
                          "request_seconds_max": max(seconds) if seconds else None}
+    summary["listwise"]["rounding_ties"] = sum(bool(r.get("rounding_tie")) for r in records if r["kind"] == "listwise")
     return summary
 
 
@@ -231,7 +236,7 @@ def live(root: Path, plan_dir: Path, approved_calls: int, env_file: Path | None 
     if listwise_judge is None or pointwise_judge is None:
         # The key is read into the environment only; it is never printed or recorded.
         load_api_key(env_file)
-    listwise_judge = listwise_judge or TypeSafeJudge()
+    listwise_judge = listwise_judge or ListwiseJudge()
     pointwise_judge = pointwise_judge or PointwiseJudge()
     # One claim per request batch: a second launch of this plan, or of an identical
     # batch prepared in another directory, is refused before any request is sent.

@@ -251,7 +251,7 @@ class Week2WorkflowTests(unittest.TestCase):
         return w.prepare(self.root, "gsm8k", self.pool, self.questions, self.ids, **kwargs)
 
     def test_prepare_freezes_exact_paid_call_count_offline(self):
-        with patch.object(w.TypeSafeJudge, "select", side_effect=AssertionError("network")), \
+        with patch.object(w.ListwiseJudge, "select", side_effect=AssertionError("network")), \
                 patch.object(w.PointwiseJudge, "judge", side_effect=AssertionError("network")):
             plan_dir = self.prepare()
         plan = json.loads((plan_dir / "plan.json").read_text())
@@ -423,7 +423,7 @@ class Week2WorkflowTests(unittest.TestCase):
         plan_dir = self.prepare()
         env = {k: v for k, v in os.environ.items() if k != "TYPESAFE_API_KEY"}
         with patch.dict(os.environ, env, clear=True), \
-                patch.object(w.TypeSafeJudge, "select", side_effect=AssertionError("network")):
+                patch.object(w.ListwiseJudge, "select", side_effect=AssertionError("network")):
             with self.assertRaises(ValueError) as ctx:
                 w.live(self.root, plan_dir, 60)
         self.assertFalse((self.root / w.CLAIMS).exists())
@@ -431,7 +431,7 @@ class Week2WorkflowTests(unittest.TestCase):
         env_file = self.root / ".env"
         env_file.write_text("TYPESAFE_API_KEY=secret-from-file\n")
         with patch.dict(os.environ, env, clear=True), \
-                patch.object(w.TypeSafeJudge, "select", side_effect=RuntimeError("stub network")) as select, \
+                patch.object(w.ListwiseJudge, "select", side_effect=RuntimeError("stub network")) as select, \
                 patch("sys.stdout", new_callable=io.StringIO) as stdout:
             with self.assertRaises(RuntimeError):
                 w.live(self.root, plan_dir, 60, env_file=env_file)
