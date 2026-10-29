@@ -25,6 +25,7 @@ data/private/*
 
 # GPU environments, per-machine settings, and local result archives
 .venv-gpu/
+.venv-judges/
 configs/server/local.json
 
 # Local machine-specific server directory record

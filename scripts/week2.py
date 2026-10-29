@@ -1,4 +1,4 @@
-"""Week 2 development data and N=16 pool generation; no paid API requests."""
+"""Week 2 data, pools and labels; only jev-live and jev-continue send paid API requests."""
 import argparse
 import json
 import os
