@@ -280,92 +280,66 @@ GSM8K has separate `gsm8k500-dry-run`, `gsm8k500-judge` and `gsm8k500-evaluate` 
 
 ## Week 2 development pools and Jev interfaces
 
-Week 2 builds shared development pools for the Week 3 selector comparison.
-They never touch held-out data. `make week2-help` lists every command.
+Week 2 builds the shared development pools that the later weeks select from.
+Held-out data is never touched. `make week2-help` lists every command.
 
-**Development sets** (`make week2-data`, local): 200 questions per task, chosen
-by a seeded hash of source IDs from pinned sources (`configs/week02/dev-sources.json`):
+- **Development sets** (`make week2-data`): 200 questions per task, chosen by a
+  seeded hash of source IDs from the pinned sources in `configs/week02/dev-sources.json`:
+  - GSM8K train, excluding the 20 Week 1 pilot questions;
+  - PRM800K's MATH train split;
+  - sanitized MBPP, rewritten into HumanEval-style prompts.
 
-- GSM8K: the train split, excluding the 20 Week 1 pilot questions.
-- MATH: PRM800K `math_splits/train.jsonl` (MATH train rows only; pinned by its LFS sha256).
-- MBPP: the sanitized subset, rewritten into HumanEval-style prompts; tasks with an
-  ambiguous entry point are dropped and recorded.
+  Preparation refuses any prompt that overlaps a held-out or diagnostic set.
+  IDs and source hashes are tracked in `data/manifests/week02-dev.json`; texts,
+  answers and tests stay in ignored `data/`.
+- **Pools** (`configs/week02/pool-*.json`): each task's Week 1 profile with N=16.
+  Candidate `i` keeps the seed `trajectory_seed(master_seed, question_id, i)`,
+  so candidates 0–7 match Week 1. `trajectories.jsonl` adds two things per candidate:
+  - each token's commit probability;
+  - drafts at 25/50/75% block progress, both the masked state and an argmax-filled draft.
 
-Preparation refuses any normalized prompt that overlaps GSM8K-500, MATH500,
-HumanEval, the pilot dev set or ProcessBench. Question IDs and source hashes
-are tracked in `data/manifests/week02-dev.json`; texts, answers and tests stay
-in ignored `data/`.
+  Recording draws no random numbers. `make test-week2-runtime` checks this on a
+  tiny CPU model, and `gpu-week2-equivalence` checks it against a Week 1 run on
+  real hardware. Pools sharing a GPU inflate wall and GPU seconds but not NFE;
+  set `JEV_RUN_NOTE` so the manifest records this.
+- **Labels**: each task reuses its Week 1 scorer:
+  - GSM8K: `gsm8k_units_v3`;
+  - MATH: the frozen Math-Verify policy, which needs `make math500-scoring-setup`;
+  - MBPP: HumanEval extraction in offline Docker, after checking every reference solution.
 
-**Pools** (`configs/week02/pool-*.json`): each task reuses its Week 1 generation
-profile, pinned by sha256, with N=16 instead of 8. Candidate `i` keeps the seed
-rule `trajectory_seed(master_seed, question_id, i)`, so candidates 0–7 share
-Week 1 seeds. `trajectories.jsonl` adds, per candidate:
+  Labels stay in `evaluation_private/`.
+- **Jev interfaces** (paid; nothing is sent without an exact approval):
+  - listwise: one Choice request per subset size;
+  - pointwise: one request per candidate, with separate `correct` and `consistent` targets.
 
-- the commit-time probability of every token, with a confidence summary;
-- drafts at 25/50/75% block progress (raw state with masks, plus an argmax-filled draft).
+  Requests carry only the public question and candidate text. A claim file
+  blocks a second launch, and errors stop without retries.
 
-Recording draws no random numbers. Two tests check this:
-`make test-week2-runtime` compares tokens, NFE and RNG state on a tiny CPU
-model, and `gpu-week2-equivalence` reproduces a Week 1 Fast-dLLM pilot run
-candidate for candidate on real hardware.
+Subset N is always the first N candidates in pool order, for labels and Jev alike.
 
 ```sh
 # Local
 make week2-data week2-check
 make remote-upload week2-upload
-# Server: optional equivalence check against your Week 1 fast-llada-dev run, then one pool per task
-make gpu-week2-equivalence GPU_ID=0 REFERENCE=artifacts/runs/<fast-llada-dev run>
+# Server
 export JEV_SHARED_HUB_CACHE=<model cache> GPU_ID=0
-make start-week2-pool TASK=gsm8k   # likewise TASK=math and TASK=mbpp
-# After an interruption: resumes into a new directory and generates only missing candidates
-make start-week2-pool TASK=math RESUME_FROM=artifacts/runs/<interrupted w2pool-math run>
+make gpu-week2-equivalence REFERENCE=artifacts/runs/<fast-llada-dev run>   # optional
+make start-week2-pool TASK=gsm8k     # likewise math, mbpp; RESUME_FROM=<run> after an interruption
+# Local, after results-pull and results-verify
+make week2-labels RUN_DIR=artifacts/downloads/lab/<w2pool run>
+python3 scripts/week2.py summary --label-dirs <w2labels-gsm8k run> <w2labels-math run> <w2labels-mbpp run>
+make week2-jev-prepare RUN_DIR=artifacts/downloads/lab/<w2pool run> JEV_FIRST=200
+make week2-jev-check PLAN_DIR=<plan>
+make week2-jev-live PLAN_DIR=<plan> APPROVED_CALLS=<planned total>
+# A stopped live run: send only the remaining calls (accepted results are kept)
+python3 scripts/week2.py jev-continue-check --plan-dir <plan>
+python3 scripts/week2.py jev-continue --plan-dir <plan> --approved-calls <additional calls>
 ```
-
-Pools sharing one GPU inflate wall and GPU seconds but not NFE. Set
-`JEV_RUN_NOTE` before starting so the manifest records the conditions.
-
-**Labels and statistics** (local, after `results-pull` and `results-verify`):
-`make week2-labels RUN_DIR=artifacts/downloads/lab/<w2pool run>`. Each task
-reuses its Week 1 scorer:
-
-- GSM8K: `gsm8k_units_v3`.
-- MATH: the frozen Math-Verify policy, run after its fixture and reference
-  controls (needs `make math500-scoring-setup`).
-- MBPP: HumanEval single-block extraction in offline Docker. Reference
-  solutions are run first, and tasks whose reference fails are excluded and recorded.
-
-Per-candidate labels stay in `evaluation_private/`. `metrics.json` reports
-mean single-sample accuracy, oracle@N, diversity and first-candidate accuracy
-for N=2/4/8/16, plus NFE, timing and commit confidence by correctness.
-Combine the three completed label runs into the Week 2 pool-quality table with
-`python3 scripts/week2.py summary --label-dirs artifacts/runs/<w2labels-gsm8k> artifacts/runs/<w2labels-math> artifacts/runs/<w2labels-mbpp>`.
-This writes `summary.md` and `summary.json` to a new `w2summary-*` directory
-and refuses label runs whose metrics changed after labeling.
-Subset N is always the first N candidates in pool order. Jev requests use
-the same subsets, and a test pins this.
-
-**Jev interfaces** (paid; nothing is sent without an exact approval):
-
-- listwise: one Choice request per subset size;
-- pointwise: one request per candidate, with separate `correct` and
-  `consistent` noul targets;
-
-for 4 + 16 = 20 calls per question.
-
-```sh
-make week2-jev-prepare RUN_DIR=artifacts/downloads/lab/<w2pool run> JEV_FIRST=3
-make week2-jev-check PLAN_DIR=<printed plan directory>
-make week2-jev-live PLAN_DIR=<plan directory> APPROVED_CALLS=<planned total>
-```
-
-Requests contain public question text and candidate text only. A claim file
-blocks a second launch of the same batch; errors stop without retries.
 
 ## Week 3 selector comparison
 
-Week 3 compares selectors on the Week 2 development pools at N=2/4/8/16.
-Everything is graded against the private Week 2 labels. `make week3-help`
-lists every command.
+Week 3 compares selectors on the Week 2 pools at N=2/4/8/16, graded against
+the private Week 2 labels. All ties go to pool order. `make week3-help` lists every command.
 
 | Selector | Source | Runs where |
 | --- | --- | --- |
@@ -375,87 +349,61 @@ lists every command.
 | Qwen2.5-7B-Instruct judge (P(Yes) to "is this correct?") | `w3judge-*` runs | server GPU |
 | Qwen2.5-Math-PRM-7B (minimum step score) | `w3prm-*` runs on GSM8K and MATH | server GPU |
 
-All ties go to pool order. The judge models are pinned by Hugging Face revision
-in `configs/week03/open-judges.json`, and their prompts by SHA-256. The PRM
-aggregation (minimum step score) was frozen before any scores were seen. The
-judges run in a separate `.venv-judges` environment pinned by
-`requirements/week3-judges.in`, so the locked generation environment stays untouched.
+How the open-weight judges are pinned:
+- models: by Hugging Face revision, in `configs/week03/open-judges.json`;
+- prompts: by SHA-256;
+- the PRM's minimum-step rule: fixed before any scores were seen.
+
+They run in a separate `.venv-judges` (`requirements/week3-judges.in`), leaving
+the generation environment untouched. Together they need about 30 GB of disk
+beside the 16 GB generator.
 
 ```sh
-# Server (no generation environment changes)
-make judges-setup                        # separate env; then judges-check
+# Server
+make judges-setup    # slow PyTorch index: cp -a .venv-gpu .venv-judges, pip install -r requirements/week3-judges.in, make judges-check
 export JEV_SHARED_HUB_CACHE=<model cache> GPU_ID=0
 make judges-fetch KIND=judge && make judges-fetch KIND=prm
 make gpu-week3-judge KIND=judge TASK=gsm8k LIMIT=2   # smoke test
-make gpu-week3-judges-all                # ~3-4 GPU hours on an A800
+make gpu-week3-judges-all                            # ~3-4 GPU hours on an A800
 # Local
-make results-pull                        # then results-verify RUN_ID=<each w3judge/w3prm run>
-make week2-jev-prepare RUN_DIR=artifacts/downloads/lab/<w2pool run> JEV_FIRST=200   # full Jev plan (paid when live)
-make week3-analyze TASK=gsm8k [W3_JEV_PLAN=<completed plan>]   # likewise math, mbpp
+make results-pull                                    # then results-verify RUN_ID=<each w3judge/w3prm run>
+make week3-analyze TASK=gsm8k W3_JEV_PLAN=<completed Jev plan>   # likewise math, mbpp
 ```
 
-If the PyTorch index is slow, the judge environment can start as a copy of the
-locked generation environment, which already holds the same `torch==2.5.1+cu121`;
-`judges-check` then verifies every pinned version, whichever way they were installed:
-
-```sh
-cp -a .venv-gpu .venv-judges
-.venv-judges/bin/python -m pip install --no-cache-dir -r requirements/week3-judges.in
-make judges-check
-```
-
-Disk: the two judge models need about 30 GB beside the 16 GB generator. A 50 GB
-data disk is too small, so expand it or temporarily move the LLaDA cache
-directory off the data disk (move it back before generating).
-
-`week3-analyze` accepts only verified local copies of full-pool judge runs
-scored against this exact pool and profile, and a Jev run that covers every
-question. Selectors without their source are skipped and listed.
-
+`week3-analyze` accepts only verified full-pool judge runs and a Jev run that
+covers every question. Selectors without a source are skipped and listed.
 `metrics.json` reports, per N:
-
-- selected-answer accuracy, with paired bootstrap 95% intervals against random and majority;
+- accuracy, with paired bootstrap intervals;
 - gap closed;
 - pool versus selector failures.
 
-It also reports within-question AUROC on the full pool, calibration (Brier,
-ECE, reliability bins) for Jev pointwise `correct` and the Qwen judge's
-P(Yes), and the cost of each source. `summary.md` gives the same results as
-tables; per-question picks stay in `evaluation_private/`.
+It also reports within-question AUROC, calibration for Jev `correct` and the
+Qwen judge's P(Yes), and costs. `summary.md` gives the same results as tables.
 
 ## Week 4 frozen final selector (Decision Point A)
 
-The Week 3 development results chose **Jev pointwise** as the final selector:
-one Jev call per candidate, and the candidate with the highest `correct`
-probability is selected. Ties go to the earliest candidate in pool order, and
-a missing score ranks last. `consistent` is recorded but not used. The held-out
-sets played no part in this choice.
+The development results chose **Jev pointwise**:
+- the candidate with the highest `correct` probability is selected;
+- ties go to pool order, and missing scores rank last;
+- `consistent` is not used.
 
-`configs/week04/selector-freeze-v1.json` pins this decision:
+The held-out sets played no part in this choice.
 
+`configs/week04/selector-freeze-v1.json` pins:
 - the rule;
-- the Jev model (`jev-1.13.0`) and response protocol (`week2_jev_v2`, whose
-  0.01 rounding tolerance affects listwise choices only);
-- the prompt used for each held-out benchmark (GSM8K-500 and MATH500 use
-  `jev_pointwise_correct_math.txt`, HumanEval `jev_pointwise_correct_code.txt`);
+- the Jev model and protocol;
+- the prompt for each held-out benchmark;
 - the SHA-256 of every prompt and implementation file;
-- the three Week 3 analyses it was chosen on, with each `metrics.json` hash and
-  Jev pointwise's N=16 accuracy.
+- the three Week 3 analyses the choice rests on.
 
 ```sh
-make week4-selector-check   # offline; no labels, no API calls
+make week4-selector-check   # offline; no labels or API calls
 ```
 
-The check refuses any changed prompt or code file, and any record that
-disagrees with the code's model, protocol or prompt map. Where the cited
-`w3analysis-*` runs exist locally, it also confirms their hashes and that Jev
-pointwise is still the most accurate selector at N=16 (ties allowed). Without
-those runs, it reports the evidence as "not available locally".
-
-`frozen_selector.check` must pass before any held-out selection. To change the
-selector, write a new versioned record rather than editing this one. The
-Makefile change that added these targets is covered by the v6 freeze and
-collection-lock records; v5 stays intact for historical archives.
+The check refuses any changed file, or a record that disagrees with the code.
+Where the cited `w3analysis-*` runs exist locally, it also confirms that Jev
+pointwise is still the most accurate selector at N=16. Run it before any
+held-out selection. To change the selector, write a new versioned record.
 
 ## Repository and local files
 
