@@ -20,6 +20,13 @@ def main():
     for name in ("plan", "audit"):
         cmd = commands.add_parser(name)
         cmd.add_argument("--run-dir", required=True, type=Path)
+        if name == "plan":
+            cmd.add_argument("--allow-stale-running", action="store_true",
+                             help="Confirm no process is active before recovering a manifest left in running state")
+    seal = commands.add_parser("seal-stale-copy")
+    seal.add_argument("--run-dir", required=True, type=Path)
+    seal.add_argument("--confirm-no-process", action="store_true", required=True,
+                      help="Confirm pgrep and nvidia-smi showed no active generator on the server")
     for name in ("upload", "source-check", "run", "run-child"):
         cmd = commands.add_parser(name)
         cmd.add_argument("--plan", required=True, type=Path)
@@ -28,8 +35,12 @@ def main():
     args = parser.parse_args()
     root = args.root.resolve()
     try:
-        if args.action == "plan":
-            result = recovery.prepare_plan(root, root / args.run_dir)
+        if args.action == "seal-stale-copy":
+            result = recovery.seal_stale_copy(root, root / args.run_dir,
+                                              confirm_no_process=args.confirm_no_process)
+        elif args.action == "plan":
+            result = recovery.prepare_plan(root, root / args.run_dir,
+                                           allow_stale_running=args.allow_stale_running)
         elif args.action == "audit":
             result = recovery.summary(recovery.inspect_run(root, root / args.run_dir))
         elif args.action == "upload":

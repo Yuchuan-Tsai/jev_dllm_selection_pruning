@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "scope": "week04_stronger_policy_development",
+  "policy": {
+    "model_id": "Qwen/Qwen3-14B",
+    "revision": "40c0698",
+    "dtype": "bfloat16",
+    "license": "apache-2.0",
+    "thinking": false,
+    "sampling": {
+      "temperature": 0.7,
+      "top_p": 0.8,
+      "top_k": 20,
+      "do_sample": true
+    },
+    "tasks": {
+      "gsm8k": {
+        "questions": "data/processed/gsm8k-w2dev.json",
+        "questions_sha256": "6f524234d29cb0e2e27cbe96ea6bb7dbf96fcc12d09548b270cb23e5aa5fe303",
+        "question_count": 200,
+        "prompt": "prompts/generation_math.txt",
+        "prompt_sha256": "03a3066561cc06f1621d0d098b2cd1835dfa30dfbab9f52d627661b4e1a3dc72",
+        "max_new_tokens": 2048
+      },
+      "math": {
+        "questions": "data/processed/math-w2dev.json",
+        "questions_sha256": "460dd2abedd6f109e0ca4891ad5b122da1194965da52ad5407316269a5437a78",
+        "question_count": 200,
+        "prompt": "prompts/generation_math.txt",
+        "prompt_sha256": "03a3066561cc06f1621d0d098b2cd1835dfa30dfbab9f52d627661b4e1a3dc72",
+        "max_new_tokens": 4096
+      },
+      "mbpp": {
+        "questions": "data/processed/mbpp-w2dev.json",
+        "questions_sha256": "f56af9cce54f28aee8b6b05b02f4080024a6a7ecf8193133a53c6cb9a4540e2c",
+        "question_count": 200,
+        "prompt": "prompts/generation_code.txt",
+        "prompt_sha256": "7b3c3996af8c05d4155331a3236846e6515011bc4385a4953753065cc6d13cc4",
+        "max_new_tokens": 2048
+      }
+    },
+    "candidates_per_question": 16,
+    "master_seed": 20261008,
+    "candidate_seed_rule": "trajectory_seed(master_seed, question_id, candidate_index)"
+  },
+  "comparison": {
+    "selector": "frozen Week 4 Jev pointwise selector: highest correct probability, ties by pool order",
+    "baselines": [
+      "first",
+      "seeded_random",
+      "majority where defined"
+    ],
+    "scoring": "reuse the Week 2 private development labels and scoring policies",
+    "heldout_used_for_choice": false,
+    "note": "This autoregressive policy does not produce diffusion trajectories; Week 2 commit-confidence and partial-draft measures are unavailable for this pool."
+  }
+}

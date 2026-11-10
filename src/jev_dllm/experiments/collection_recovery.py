@@ -14,7 +14,7 @@ import time
 
 from . import collection, frozen
 from .selection import new_run, write_json
-from ..operations.remote import run_snapshot, snapshot_digest, valid_run_id, verify_copy
+from ..operations.remote import digest_file, run_snapshot, snapshot_digest, valid_run_id, verify_copy
 from ..reproducibility import trajectory_seed
 from ..schema import Candidate, CostRecord
 
@@ -87,7 +87,83 @@ def receipt_for(run):
     return snapshot
 
 
-def inspect_run(root, run, *, snapshot=None):
+def stale_running_snapshot(root, run_id):
+    """Hash an explicitly stale-running server run after checking its recorded PID is gone."""
+    valid_run_id(run_id)
+    base = root / "artifacts/runs"
+    run = base / run_id
+    if base.is_symlink() or run.is_symlink() or run.resolve().parent != base.resolve():
+        raise ValueError("Run directory must be a direct, non-symlink child of artifacts/runs")
+    if not run.is_dir() or run.stat().st_uid != os.getuid():
+        raise ValueError("Run must exist and belong to the current user")
+    manifest_path = run / "manifest.json"
+    if manifest_path.is_symlink():
+        raise ValueError("Manifest must not be a symlink")
+    raw_manifest = manifest_path.read_bytes()
+    manifest = json.loads(raw_manifest)
+    if manifest.get("status") != "running":
+        raise ValueError("Stale-running snapshot requires a manifest with status=running")
+    pid = manifest.get("pid")
+    if type(pid) is int and pid > 0:
+        cmdline_path = Path("/proc") / str(pid) / "cmdline"
+        try:
+            cmdline = cmdline_path.read_bytes().replace(b"\0", b" ").decode("utf-8", "replace")
+        except FileNotFoundError:
+            cmdline = ""
+        if "scripts/collect_benchmarks.py" in cmdline or "scripts/recover_collection.py" in cmdline:
+            raise ValueError(f"Recorded generation process {pid} is still active")
+    files = {}
+    for path in sorted(run.rglob("*")):
+        if path.is_symlink():
+            raise ValueError("Run contains a symlink; refusing stale-run snapshot")
+        if path.is_file():
+            files[path.relative_to(run).as_posix()] = {
+                "bytes": path.stat().st_size, "sha256": digest_file(path)}
+        elif not path.is_dir():
+            raise ValueError("Unexpected special file in run")
+    if manifest_path.read_bytes() != raw_manifest:
+        raise ValueError("Run changed during stale-running snapshot")
+    return {"run_id": run_id, "status": "running", "files": files}
+
+
+def seal_stale_copy(root, run, *, confirm_no_process=False):
+    """Create a local receipt for a copied stale-running source; server hashes are rechecked before resume."""
+    if not confirm_no_process:
+        raise ValueError("Pass the explicit no-process confirmation after checking pgrep and nvidia-smi")
+    manifest = json.loads((run / "manifest.json").read_text())
+    if manifest.get("status") != "running":
+        raise ValueError("Only a stale run whose manifest remains running can use this receipt path")
+    files = {}
+    for path in sorted(run.rglob("*")):
+        if path.is_symlink():
+            raise ValueError("Local copy contains a symlink; refusing to seal it")
+        if path.is_file():
+            files[path.relative_to(run).as_posix()] = {
+                "bytes": path.stat().st_size, "sha256": digest_file(path)}
+        elif not path.is_dir():
+            raise ValueError("Local copy contains an unexpected special file")
+    snapshot = {"run_id": run.name, "status": "running", "files": files}
+    verify_copy(run.parent, snapshot)
+    receipt_dir = run.parent / ".receipts"
+    receipt_dir.mkdir(exist_ok=True)
+    receipt_path = receipt_dir / f"{run.name}.json"
+    receipt = {"snapshot": snapshot, "digest": snapshot_digest(snapshot),
+               "local_stale_copy_seal": True,
+               "note": "Remote source hashes and recorded generator PID are rechecked before recovery starts."}
+    if receipt_path.exists():
+        old = json.loads(receipt_path.read_text())
+        if old.get("digest") != receipt["digest"]:
+            raise ValueError("An existing receipt differs; preserve it and investigate before continuing")
+    else:
+        with receipt_path.open("x") as stream:
+            json.dump(receipt, stream, indent=2)
+            stream.write("\n")
+    info = inspect_run(root, run, snapshot=snapshot, allow_stale_running=True)
+    return {**summary(info), "local_copy_sealed": True,
+            "verified_files": len(files), "verified_digest": receipt["digest"]}
+
+
+def inspect_run(root, run, *, snapshot=None, allow_stale_running=False):
     """Validate the ordered public-only prefix, never score or filter answers."""
     snapshot = snapshot if snapshot is not None else receipt_for(run)
     if snapshot.get("run_id") != run.name:
@@ -97,8 +173,12 @@ def inspect_run(root, run, *, snapshot=None):
     task = manifest["task"]
     spec, questions = collection.check(root, task)
     config, protocol = spec["backend_profile"], collection.contract(root, task)
+    status = manifest.get("status")
+    allowed_statuses = {"interrupted", "failed", "complete"}
+    if allow_stale_running:
+        allowed_statuses.add("running")
     if (manifest.get("mode") != collection.SCOPE or manifest.get("protocol") != protocol
-            or manifest.get("status") not in ("interrupted", "failed", "complete")
+            or status not in allowed_statuses
             or snapshot.get("status") != manifest["status"]
             or manifest.get("question_count") != len(questions)
             or manifest.get("candidates_per_question") != 8
@@ -119,7 +199,8 @@ def inspect_run(root, run, *, snapshot=None):
     elif "prior_segments" in manifest or (run / "recovery-plan.json").exists():
         raise ValueError("Recovery metadata is incomplete")
     return {"snapshot": snapshot, "config": config, "manifest": manifest,
-            "protocol": protocol, "questions": questions, "work": work, "count": count}
+            "protocol": protocol, "questions": questions, "work": work, "count": count,
+            "allow_stale_running": allow_stale_running}
 
 
 def check_lineage(root, run, manifest, work):
@@ -153,10 +234,16 @@ def check_lineage(root, run, manifest, work):
     if frozen.sha256(source_manifest) != plan["source_snapshot"]["files"]["manifest.json"]["sha256"]:
         raise ValueError("Original source manifest was not preserved")
     parent = json.loads(source_manifest.read_text())
+    expected_status = plan.get("source_status", "interrupted")
+    valid_source_state = (parent.get("status") == "interrupted"
+                          and parent.get("error_type") == "KeyboardInterrupt")
+    if expected_status == "running":
+        valid_source_state = (plan.get("stale_running_confirmed") is True
+                              and parent.get("status") == "running"
+                              and parent.get("error_type") is None)
     if (parent.get("completed_candidates") != plan["preserved_candidates"]
             or parent.get("protocol") != plan["protocol"]
-            or parent.get("status") != "interrupted"
-            or parent.get("error_type") != "KeyboardInterrupt"
+            or not valid_source_state
             or manifest.get("prior_segments") != prior_segments(parent, plan["source_run_id"])):
         raise ValueError("Recovery segment timing history differs")
 
@@ -183,11 +270,14 @@ def summary(info):
 
 def build_plan(root, info):
     m = info["manifest"]
-    if m.get("status") != "interrupted" or m.get("error_type") != "KeyboardInterrupt" or info["count"] >= len(info["work"]):
-        raise ValueError("Manual recovery requires an interrupted, incomplete run; inspect failed/complete runs separately")
+    interrupted = m.get("status") == "interrupted" and m.get("error_type") == "KeyboardInterrupt"
+    stale_running = m.get("status") == "running" and info.get("allow_stale_running") is True
+    if not (interrupted or stale_running) or info["count"] >= len(info["work"]):
+        raise ValueError("Recovery requires an incomplete KeyboardInterrupt run, or an explicitly confirmed stale-running run")
     return {"schema_version": 1, "kind": KIND, "task": m["task"],
         "source_run_id": info["snapshot"]["run_id"], "source_snapshot": info["snapshot"],
         "source_digest": snapshot_digest(info["snapshot"]),
+        "source_status": m["status"], "stale_running_confirmed": stale_running,
         "protocol": info["protocol"], "extension_sha256": extension_hashes(root),
         "preserved_candidates": info["count"], "total_candidates": len(info["work"]),
         "next_candidate_id": info["work"][info["count"]][1],
@@ -196,8 +286,8 @@ def build_plan(root, info):
         "limitation": "Candidate boundary recovery, not restoration of an interrupted diffusion trajectory; GPU bitwise equivalence is not asserted."}
 
 
-def prepare_plan(root, run, destination=None):
-    info = inspect_run(root, run)
+def prepare_plan(root, run, destination=None, *, allow_stale_running=False):
+    info = inspect_run(root, run, allow_stale_running=allow_stale_running)
     plan = build_plan(root, info)
     destination = destination or root / "artifacts/collection-recovery-plans" / (run.name + ".json")
     if destination.exists():
@@ -219,6 +309,10 @@ def check_plan(root, plan_path):
     collection.profile_path(plan["task"])
     if plan.get("source_digest") != snapshot_digest(plan["source_snapshot"]):
         raise ValueError("Recovery snapshot digest differs")
+    if plan.get("source_status") not in ("interrupted", "running"):
+        raise ValueError("Recovery plan source state is not recoverable")
+    if plan.get("stale_running_confirmed") is not (plan.get("source_status") == "running"):
+        raise ValueError("Stale-running confirmation does not match the source state")
     if plan.get("extension_sha256") != extension_hashes(root):
         raise ValueError("Recovery implementation differs from the audited plan")
     return plan
@@ -227,10 +321,13 @@ def check_plan(root, plan_path):
 def check_server_source(root, plan_path):
     plan = check_plan(root, plan_path)
     run = root / "artifacts/runs" / plan["source_run_id"]
-    current = run_snapshot(root, run.name)
+    current = (stale_running_snapshot(root, run.name)
+               if plan.get("stale_running_confirmed") is True
+               else run_snapshot(root, run.name))
     if snapshot_digest(current) != plan["source_digest"]:
         raise ValueError("Server source differs from the verified local copy")
-    info = inspect_run(root, run, snapshot=current)
+    info = inspect_run(root, run, snapshot=current,
+                       allow_stale_running=plan.get("stale_running_confirmed") is True)
     if plan != build_plan(root, info):
         raise ValueError("Recovery plan does not match the interrupted source")
     return plan, run, info
@@ -318,7 +415,10 @@ def recover(root, plan_path):
                 print(f"[{plan['task']}] Completed {m['completed_candidates']}/{len(work)} candidates (preserved {preserved})", flush=True)
         check_rows(run, work, m)
         check_lineage(root, run, m, work)
-        if snapshot_digest(run_snapshot(root, source.name)) != plan["source_digest"]:
+        final_source_snapshot = (stale_running_snapshot(root, source.name)
+                                 if plan.get("stale_running_confirmed") is True
+                                 else run_snapshot(root, source.name))
+        if snapshot_digest(final_source_snapshot) != plan["source_digest"]:
             raise ValueError("Original source changed during recovery")
         m["status"] = "complete"
     except BaseException as exc:

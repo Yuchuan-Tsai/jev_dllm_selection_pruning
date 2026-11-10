@@ -28,6 +28,7 @@ SOURCE_PLAN ?=
 MATH_PYTHON ?= .venv-math/bin/python
 MATH_BOOTSTRAP_PYTHON ?= python3.12
 JEV_PLAN ?=
+JEV_FIRST ?= 200
 VALIDATION_RUN ?=
 SCORING_PLAN ?=
 export GPU_ID
@@ -567,6 +568,7 @@ week2-jev-live:
 
 # Week 3 selector comparison on the Week 2 development pools
 JUDGE_PYTHON ?= .venv-judges/bin/python
+WEEK4_PYTHON ?= .venv-week4/bin/python
 KIND ?=
 LIMIT ?=
 POOL_DIR ?=
@@ -614,11 +616,75 @@ week3-analyze:
 	@test -n "$(TASK)" || (echo 'Set TASK to gsm8k, math or mbpp'; exit 2)
 	$(PYTHON) scripts/week3.py analyze --task "$(TASK)" --math-python "$(MATH_PYTHON)" $(if $(W3_JEV_PLAN),--jev-plan "$(W3_JEV_PLAN)",)
 
-.PHONY: week4-help week4-selector-check
+.PHONY: week4-help week4-selector-check week4-qwen-check week4-qwen-setup week4-qwen-fetch gpu-week4-qwen-pool week4-qwen-jev-prepare week4-qwen-analyze week4-pruning-setup week4-pruning-prepare week4-pruning-check week4-pruning-live week4-pruning-analyze
 
 week4-help:
 	@echo 'Local (offline): week4-selector-check (frozen Jev pointwise selector, Decision Point A)'
+	@echo 'Qwen policy setup: remote-upload, week4-qwen-setup (server), week4-qwen-check, week4-qwen-fetch GPU_ID=...'
+	@echo 'Server: gpu-week4-qwen-pool TASK=gsm8k|math|mbpp GPU_ID=... [LIMIT=2 pilot] [RESUME_FROM=<failed run>]'
+	@echo 'Local: results-pull; results-verify RUN_ID=...; week4-qwen-jev-prepare TASK=... POOL_DIR=... [JEV_FIRST=200]'
+	@echo 'After week2-jev-live completes: week4-qwen-analyze TASK=... POOL_DIR=... JEV_PLAN=... (MATH needs MATH_PYTHON; MBPP needs Docker)'
+	@echo 'Partial-draft replay (CPU): week4-pruning-setup; week4-pruning-prepare [PRUNING_TASK=gsm8k|math PRUNING_FIRST=200 PRUNING_CHECKPOINT=... PRUNING_KEEP=8]; check/live/analyze using printed plan path'
+	@echo 'Compare saved checkpoints: GSM8K 2, 4, 6 or MATH 4, 8, 12; 200 Jev calls per new checkpoint, then week4-pruning-compare PRUNING_ANALYSIS_DIRS="<analysis1> <analysis2> <analysis3>"'
 	@echo 'See the Week 4 section of README.md.'
 
 week4-selector-check:
 	$(PYTHON) scripts/week4.py selector-check
+
+week4-qwen-setup:
+	@umask 077; $(SERVER_PYTHON) -m venv --system-site-packages .venv-week4
+	@umask 077; mkdir -p .cache/pip-tmp
+	TMPDIR="$(CURDIR)/.cache/pip-tmp" $(WEEK4_PYTHON) -m pip install --no-cache-dir --only-binary=:all: -r requirements/week4-qwen-policy.in
+	$(MAKE) week4-qwen-check
+
+week4-qwen-check:
+	$(WEEK4_PYTHON) scripts/week4_qwen.py check
+	$(WEEK4_PYTHON) -m pip check
+
+week4-qwen-fetch:
+	$(MAKE) week4-qwen-check
+	$(WEEK4_PYTHON) scripts/week4_qwen.py fetch
+
+gpu-week4-qwen-pool:
+	@test -n "$(TASK)" || (echo 'Set TASK to gsm8k, math or mbpp'; exit 2)
+	$(MAKE) week4-qwen-check
+	$(WEEK4_PYTHON) scripts/week4_qwen.py generate --task "$(TASK)" $(if $(LIMIT),--limit "$(LIMIT)",) $(if $(RESUME_FROM),--resume-from "$(RESUME_FROM)",)
+
+week4-qwen-jev-prepare:
+	@test -n "$(TASK)" -a -n "$(POOL_DIR)" || (echo 'Set TASK and POOL_DIR'; exit 2)
+	$(PYTHON) scripts/week4_qwen.py jev-prepare --task "$(TASK)" --pool-dir "$(POOL_DIR)" --first "$(JEV_FIRST)"
+
+week4-qwen-analyze:
+	@test -n "$(TASK)" -a -n "$(POOL_DIR)" -a -n "$(JEV_PLAN)" || (echo 'Set TASK, POOL_DIR and JEV_PLAN'; exit 2)
+	$(PYTHON) scripts/week4_qwen.py analyze --task "$(TASK)" --pool-dir "$(POOL_DIR)" --jev-plan "$(JEV_PLAN)" --math-python "$(MATH_PYTHON)"
+
+PRUNING_PLAN_DIR ?=
+PRUNING_PYTHON ?= .venv-week4-pruning/bin/python
+PRUNING_TASK ?= gsm8k
+PRUNING_FIRST ?= 20
+PRUNING_CHECKPOINT ?= 2
+PRUNING_KEEP ?= 8
+PRUNING_POOL ?= $(if $(filter math,$(PRUNING_TASK)),artifacts/downloads/lab/w2pool-math-20261026T204300Z-10703977,artifacts/downloads/lab/w2pool-gsm8k-20261026T204300Z-2603fbb3)
+week4-pruning-setup:
+	@umask 077; python3 -m venv .venv-week4-pruning
+	$(PRUNING_PYTHON) -m pip install --only-binary=:all: -r requirements/week4-pruning-cpu.in
+
+week4-pruning-prepare:
+	$(PRUNING_PYTHON) scripts/week4_pruning.py prepare --task "$(PRUNING_TASK)" --pool-dir "$(PRUNING_POOL)" --first "$(PRUNING_FIRST)" --checkpoint "$(PRUNING_CHECKPOINT)" --keep "$(PRUNING_KEEP)" $(if $(ALLOW_TOKENIZER_DOWNLOAD),--allow-tokenizer-download,)
+
+week4-pruning-check:
+	@test -n "$(PRUNING_PLAN_DIR)" || (echo 'Set PRUNING_PLAN_DIR to the prepared Week 4 pruning plan'; exit 2)
+	$(PRUNING_PYTHON) scripts/week4_pruning.py check --plan-dir "$(PRUNING_PLAN_DIR)"
+
+week4-pruning-live:
+	@test -n "$(PRUNING_PLAN_DIR)" -a -n "$(APPROVED_CALLS)" || (echo 'Set PRUNING_PLAN_DIR and APPROVED_CALLS'; exit 2)
+	$(PRUNING_PYTHON) scripts/week4_pruning.py live --plan-dir "$(PRUNING_PLAN_DIR)" --approved-calls "$(APPROVED_CALLS)" --env-file "$(ENV_FILE)"
+
+week4-pruning-analyze:
+	@test -n "$(PRUNING_PLAN_DIR)" || (echo 'Set PRUNING_PLAN_DIR'; exit 2)
+	$(PRUNING_PYTHON) scripts/week4_pruning.py analyze --plan-dir "$(PRUNING_PLAN_DIR)"
+
+PRUNING_ANALYSIS_DIRS ?=
+week4-pruning-compare:
+	@test -n "$(PRUNING_ANALYSIS_DIRS)" || (echo 'Set PRUNING_ANALYSIS_DIRS to three MATH analysis directories in any order'; exit 2)
+	$(PRUNING_PYTHON) scripts/week4_pruning.py compare --analysis-dirs $(PRUNING_ANALYSIS_DIRS)

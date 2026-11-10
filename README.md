@@ -19,9 +19,9 @@ one another. No `make -f` option is needed.
 
 ## Version compatibility
 
-New runs use the `gsm8k500-freeze-v6.json` and `generation-lock-v6.json`
+New runs use the `gsm8k500-freeze-v8.json` and `generation-lock-v8.json`
 implementation records. v3 added an opt-in A800 substitute for the pinned A100
-(see below); v4, v5 and v6 add the Week 2, Week 3 and Week 4 Make targets. Sampling settings, source
+(see below); v4, v5 and v6 add the Week 2, Week 3 and Week 4 selector-check Make targets; v7 adds the separate Qwen policy workflow; v8 reuses the PyTorch runtime supplied by the selected A800 image. Sampling settings, source
 revisions, prompts, seeds and scoring rules are unchanged since v2.
 The original records remain intact as historical metadata; old archives and Jev
 plans must be analyzed or resumed using the code revision recorded when they
@@ -64,7 +64,7 @@ On the local computer, after configuring SSH:
 
 ```sh
 make remote-plan
-make remote-upload
+make remote-upload week2-upload
 make benchmarks-check benchmarks-upload
 ```
 
@@ -254,6 +254,21 @@ Each Jev request contains one public question and all eight answers in seeded sh
 
 The live command stops on any error, retains partial evidence and prevents replaying the same batch—even through a newly prepared plan. Do not delete its claim to force a retry. A failed/uncertain billed request needs a reviewed continuation rather than rerunning the entire batch. Token usage and latency are recorded; unknown dollar cost stays null.
 
+For a held-out run under the frozen Week 4 selector, use the pointwise adapter below after the
+verified HumanEval archive has been scored and extraction reanalysis is complete. It submits one
+Jev request per candidate (1,312 total), then selects the highest `correct` probability per task;
+ties follow original pool order. The older `humaneval-jev-*` commands are listwise and do not
+implement this frozen selector.
+
+```sh
+.venv/bin/python scripts/humaneval_pointwise.py prepare --archive "$RUN_DIR"
+# Set PLAN_DIR to the printed plan path; this check is offline.
+.venv/bin/python scripts/humaneval_pointwise.py check --plan-dir "$PLAN_DIR"
+# This command sends 1,312 paid Jev requests.
+.venv/bin/python scripts/humaneval_pointwise.py live --plan-dir "$PLAN_DIR" --approved-calls 1312 --env-file .env
+.venv/bin/python scripts/humaneval_pointwise.py evaluate --plan-dir "$PLAN_DIR" --score-run "$EXTRACTION_RUN"
+```
+
 For a HumanEval batch stopped specifically by a Choice/probability mismatch,
 use `make humaneval-jev-continuation-prepare`. The original
 batch and its frozen files stay unchanged. It supports one explicitly approved
@@ -404,6 +419,137 @@ The check refuses any changed file, or a record that disagrees with the code.
 Where the cited `w3analysis-*` runs exist locally, it also confirms that Jev
 pointwise is still the most accurate selector at N=16. Run it before any
 held-out selection. To change the selector, write a new versioned record.
+
+## Week 4 stronger policy model
+
+Professor Zhang suggested checking whether Jev still helps when it chooses
+among answers from a stronger generator. The development-only setup uses
+**Qwen3-14B** at pinned Hugging Face revision `40c0698`, in BF16 on one A100 or
+A800. It uses the same 200 Week 2 development questions per task, 16 candidates
+per question, task scoring policies and frozen Jev pointwise rule. The model
+uses its reasoning mode with the model-card sampling values (temperature 0.6,
+top-p 0.95, top-k 20); maximum output lengths are pinned per task in
+`configs/week04/qwen3-14b-policy.json`.
+
+The Qwen policy is autoregressive, so its runs do not have LLaDA diffusion
+confidence or partial-draft checkpoints. Generation time and peak memory are
+recorded; NFE is left unknown. This isolates the question “does Jev help choose
+among stronger-model answers?” from the separate partial-draft pruning study.
+
+On the server, upload the project, install the separate environment, and cache
+the model. The install and model download are explicit because they need network
+access and roughly 28 GB of BF16 model weights plus runtime space:
+
+```sh
+make remote-upload
+make week4-qwen-setup SERVER_PYTHON=/root/miniconda3/bin/python3.12
+make week4-qwen-check
+make week4-qwen-fetch GPU_ID=0
+make gpu-week4-qwen-pool TASK=gsm8k GPU_ID=0 LIMIT=2  # small runtime pilot
+make gpu-week4-qwen-pool TASK=gsm8k GPU_ID=0          # full development pool
+# If generation stops, resume from its incomplete run directory:
+make gpu-week4-qwen-pool TASK=gsm8k GPU_ID=0 RESUME_FROM=artifacts/runs/<failed-run>
+```
+
+Repeat generation for `math` and `mbpp`. After copying and verifying each pool
+on the local machine, prepare Jev requests against that exact Qwen pool, review
+the plan, and run the existing approved paid-call workflow:
+
+```sh
+make results-pull
+make results-verify RUN_ID=<exact-run-directory>
+make week4-qwen-jev-prepare TASK=gsm8k POOL_DIR=artifacts/downloads/lab/<run> JEV_FIRST=200
+make week2-jev-check PLAN_DIR=<printed-plan-directory>
+make week2-jev-live PLAN_DIR=<printed-plan-directory> APPROVED_CALLS=<planned-total>
+make week4-qwen-analyze TASK=gsm8k POOL_DIR=artifacts/downloads/lab/<run> JEV_PLAN=<plan-directory>
+```
+
+The analysis compares Jev pointwise, first answer, and seeded random selection
+at N=2/4/8/16 on the same Qwen-generated pool. MATH scoring needs the isolated
+Math-Verify environment; MBPP scoring uses the existing offline Docker scorer.
+This experiment uses development questions only and does not alter the frozen
+held-out selector or claim results until the Qwen pools, Jev selections and
+private scoring have actually been completed.
+
+## Week 4 partial-draft pruning pilot
+
+The first pruning pilot uses the archived **LLaDA GSM8K** development pool,
+because its saved trajectories include intermediate diffusion states. At block
+2, Jev ranks the 16 visible draft prefixes for each of the first 20 questions;
+the replay keeps the highest-probability 8. Its first pass reuses the full
+answers that were already generated to measure whether a correct answer remains
+in the retained set and to estimate avoidable NFE/GPU time from the saved
+checkpoint and full-run costs. This costs 20 Jev calls, but needs no GPU.
+
+This is a retrospective replay, not a live stop-and-resume measurement: the
+original generation had already finished. The retained-pool oracle is an upper
+bound on eventual answer accuracy. A later GPU run is needed to measure actual
+continuation cost and resumed-answer quality. No accuracy-loss threshold is
+fixed by this pilot; choose it after reviewing the exploratory result.
+
+```sh
+# One-time local CPU environment; the tokenizer is small and no GPU is used.
+make week4-pruning-setup
+# Add ALLOW_TOKENIZER_DOWNLOAD=1 if the LLaDA tokenizer is not cached locally.
+make week4-pruning-prepare ALLOW_TOKENIZER_DOWNLOAD=1
+make week4-pruning-check PRUNING_PLAN_DIR=artifacts/runs/<printed-plan-directory>
+# Review the plan (20 paid Jev Choice requests) before sending anything:
+make week4-pruning-live PRUNING_PLAN_DIR=artifacts/runs/<printed-plan-directory> APPROVED_CALLS=20
+make week4-pruning-analyze PRUNING_PLAN_DIR=artifacts/runs/<printed-plan-directory>
+```
+
+To change pilot size, checkpoint or retained count, pass `PRUNING_FIRST`,
+`PRUNING_CHECKPOINT` (2, 4 or 6), or `PRUNING_KEEP` (2–15). The offline
+prepare/check steps make no Jev calls. The explicit live command is the only
+step that sends paid requests.
+
+### MATH checkpoint comparison
+
+The Week 2 MATH development pool has saved partial drafts at completed blocks
+4, 8 and 12 (32 token positions per block). Use the same 200 questions and
+retain 8 of 16 candidates at every checkpoint. Existing Math-Verify development
+labels are reused; this does not use the held-out MATH500 test questions or need
+a GPU. Each checkpoint requires 200 Jev Choice requests, 600 total. Prepare and
+check every plan first, then run each explicitly approved paid batch:
+
+```sh
+make week4-pruning-setup
+make week4-pruning-prepare PRUNING_TASK=math PRUNING_FIRST=200 PRUNING_CHECKPOINT=4 PRUNING_KEEP=8
+make week4-pruning-prepare PRUNING_TASK=math PRUNING_FIRST=200 PRUNING_CHECKPOINT=8 PRUNING_KEEP=8
+make week4-pruning-prepare PRUNING_TASK=math PRUNING_FIRST=200 PRUNING_CHECKPOINT=12 PRUNING_KEEP=8
+# For each printed plan path:
+make week4-pruning-check PRUNING_PLAN_DIR=<plan-directory>
+make week4-pruning-live PRUNING_PLAN_DIR=<plan-directory> APPROVED_CALLS=200
+make week4-pruning-analyze PRUNING_PLAN_DIR=<plan-directory>
+# After all three analyses:
+make week4-pruning-compare PRUNING_ANALYSIS_DIRS="<analysis-4> <analysis-8> <analysis-12>"
+```
+
+The comparison report separates retained-pool oracle accuracy from top-ranked
+answer accuracy. Compute savings are replay estimates based on old full runs,
+not measured live pause/resume savings.
+
+To extend the completed GSM8K checkpoint-2 replay to the later saved checkpoints
+4 and 6, run both new 200-call plans and compare them with the existing checkpoint
+2 analysis. The existing checkpoint-2 replay is reused; it is not billed again.
+
+```sh
+make week4-pruning-prepare PRUNING_TASK=gsm8k PRUNING_FIRST=200 PRUNING_CHECKPOINT=4 PRUNING_KEEP=8
+PLAN4=$(ls -td artifacts/runs/week4-pruning-gsm8k-plan-* | head -1)
+make week4-pruning-prepare PRUNING_TASK=gsm8k PRUNING_FIRST=200 PRUNING_CHECKPOINT=6 PRUNING_KEEP=8
+PLAN6=$(ls -td artifacts/runs/week4-pruning-gsm8k-plan-* | head -1)
+
+make week4-pruning-check PRUNING_PLAN_DIR="$PLAN4"
+make week4-pruning-check PRUNING_PLAN_DIR="$PLAN6"
+make week4-pruning-live PRUNING_PLAN_DIR="$PLAN4" APPROVED_CALLS=200
+make week4-pruning-analyze PRUNING_PLAN_DIR="$PLAN4"
+ANALYSIS4=$(ls -td artifacts/runs/week4-pruning-gsm8k-analysis-* | head -1)
+make week4-pruning-live PRUNING_PLAN_DIR="$PLAN6" APPROVED_CALLS=200
+make week4-pruning-analyze PRUNING_PLAN_DIR="$PLAN6"
+ANALYSIS6=$(ls -td artifacts/runs/week4-pruning-gsm8k-analysis-* | head -1)
+
+make week4-pruning-compare PRUNING_ANALYSIS_DIRS="artifacts/runs/week4-pruning-gsm8k-analysis-20261108T055424Z-e3057cd8 $ANALYSIS4 $ANALYSIS6"
+```
 
 ## Repository and local files
 

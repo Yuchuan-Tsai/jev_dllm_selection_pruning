@@ -13,7 +13,8 @@ def upload_plan(root, plan_path, config):
     plan = recovery.check_plan(root, plan_path)
     source = Path(config["local_results"]) / plan["source_run_id"]
     # Rebuild/compare the exact plan before sending anything, including its allowlisted fields.
-    recovery.prepare_plan(root, source, plan_path)
+    recovery.prepare_plan(root, source, plan_path,
+                          allow_stale_running=plan.get("stale_running_confirmed") is True)
     tracked = subprocess.run(["git", "ls-files", "-z"], cwd=root,
                              check=True, capture_output=True).stdout.decode().split("\0")
     if not set(recovery.EXTENSION_FILES).issubset(tracked):

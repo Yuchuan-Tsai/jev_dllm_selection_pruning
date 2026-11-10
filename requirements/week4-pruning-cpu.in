@@ -1,0 +1,4 @@
+# CPU-only tokenizer dependencies for decoding archived LLaDA checkpoint prefixes.
+transformers==4.38.2
+tokenizers==0.15.2
+sentencepiece==0.2.0
